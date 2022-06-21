@@ -1,16 +1,25 @@
-import Structs as Stru
-import Painter as Pain
+import Canvas as Cnvs ( frame )
+import Shapes as Shps ( road, box )
 
---TODO:
+------------------------------- TODO ------------------------------------------
 -- figure out the rules of indentation and multiline expressions
 -- learn to make my own types and type constructors
 -- how to make exceptions for special cases? (pattern matching and guards will help)
 -- $ ?????
 
-testCoordsToPaint :: [(Int, Int)]
-testCoordsToPaint = [(0, 0), (3, 2), (5, 0)]
-testMCScreen :: [(Int, Int, String)]
-testMCScreen = Stru.mCScreen testCoordsToPaint
+
+--------------------------- FUNCS FOR MAIN -------------------------------------
+myBubbleSort :: [Int] -> [Int]
+myBubbleSort xs = xs --IMPLEMENT!
+
+-- sort by line. Then sort by x_pos in line and remove duplicates
+arrangePoints :: [(Int, Int)] -> [(Int, Int)]
+arrangePoints pointsToPaint = pointsToPaint --IMPLEMENT!
+
+
+----------------------------- MAIN ---------------------------------------------
+pointsToPaint :: [(Int, Int)]
+pointsToPaint = arrangePoints $ box (2, 2) (10, 5) ++ road (5, 4) (30, 4) -- OH MY
 
 renderFrame :: IO ()
-renderFrame = putStr $ unlines $ Pain.frame testMCScreen Stru.screenSize
+renderFrame = putStr $ unlines $ frame pointsToPaint
