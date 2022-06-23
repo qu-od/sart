@@ -17,10 +17,10 @@ data Pixel = MakePixel {coords :: Point, color :: Color} deriving (Show)
 
 --------------------------------- CONSTS ---------------------------------------
 screenWidth :: Int
-screenWidth = 200
+screenWidth = 180
 
 screenHeight :: Int
-screenHeight = 10
+screenHeight = 6
 
 backgroundColor :: Color
 backgroundColor = MakeColor '.'
