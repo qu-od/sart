@@ -83,4 +83,8 @@ getFirstThreeElemsFromListAndTheRest [] = error "len of list is 0. minimum 3."
 getFirstThreeElemsFromListAndTheRest (fst:snd:thrd:theRest) =
     (fst, snd, thrd, theRest)
 
-
+elem' :: (Eq a) => a -> [a] -> Bool
+elem' _ [] = False
+elem' item (x:xs)
+    | item == x = True
+    | otherwise = elem' item xs

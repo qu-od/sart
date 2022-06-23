@@ -1,32 +1,35 @@
 module Painter
-(frame
+( Point (MakePoint)
+, Color (MakeColor)
+, Pixel (MakePixel)
+, frame
 , paint
 ) where
 
 
 --------------------------------- TYPES ----------------------------------------
-data Point = MakePoint (Int, Int)
+data Point = MakePoint {getX :: Int, getY :: Int} deriving (Show, Eq)
 
-data Paint = MakePaint String -- ADD LEN=2 CONSTRAINT (or a literal constraint may be??)
+data Color = MakeColor {symbol :: Char} deriving (Show)
 
-data Pixel = MakePixel (Int, Int, Paint)
+data Pixel = MakePixel {coords :: Point, color :: Color} deriving (Show)
 
 
 --------------------------------- CONSTS ---------------------------------------
 screenWidth :: Int
-screenWidth = 80
+screenWidth = 200
 
 screenHeight :: Int
-screenHeight = 6
+screenHeight = 10
 
-backgroundColorSymbol :: Char
-backgroundColorSymbol = '.'
+backgroundColor :: Color
+backgroundColor = MakeColor '.'
 
-defaultBackgroundColorSymbol :: Char
-defaultBackgroundColorSymbol = '-'
+defaultBackgroundColor :: Color
+defaultBackgroundColor = MakeColor '-'
 
-defaultColorSymbol :: Char
-defaultColorSymbol = '@'
+defaultColor :: Color
+defaultColor = MakeColor '@'
 
 screenSize :: (Int, Int)
 screenSize = (screenWidth, screenHeight)
@@ -67,66 +70,67 @@ myStoneSortWithDupesDeletion sorted unsorted =
         trailingPart = drop (holeIndex + 1) unsorted
         updatedSorted = if bubble /= head sorted then bubble:sorted else sorted
 
--- Point -> Char -> Pixel
-paint :: Char -> [(Int, Int)] -> [(Int, Int, String)]
-paint symbol points = [(x, y, [symbol, symbol]) | (x, y) <- points]
+paint :: Char -> [Point] -> [Pixel]
+paint symbol points = [MakePixel pt (MakeColor symbol) | pt <- points]
 
-pixelsCoords :: [(Int, Int, String)] -> [(Int, Int)]
-pixelsCoords pixels = [(x, y) | (x, y, _) <- pixels]
+--pixelsCoords :: [Pixel] -> [Point] --стало ненужно))0
+--pixelsCoords pixels = [coords px | px <- pixels]
 
-colorOfPoint :: (Int, Int) -> [(Int, Int, String)] -> String
-colorOfPoint point pixels = thrd (pixels !! i)
-    where i = findIndexOfTheFirstMatch point (pixelsCoords pixels)
+colorInThePoint :: Point -> [Pixel] -> Color
+colorInThePoint point pixels = color (pixels !! i)
+    where i = findIndexOfTheFirstMatch point (map coords pixels)
 
 
 ---------------------------- MONOCHROME SCREEN ---------------------------------
--- data struct: Pixel = (pixel_x, pixel_y, pixel_symbol)
--- monochromeScreen :: [Point] -> [Pixel]
 -- func monochromeScreen paints points turning them into pixels.
     -- Since it's monochrome, there is only one color to paint with
-monochromeScreen :: [(Int, Int)] -> [(Int, Int, String)]
+monochromeScreen :: [(Int, Int)] -> [(Int, Int, Color)]
 monochromeScreen pixelsToPaint = 
   [(x, y, chooseMonochromeSymbol (x, y)) | y <- ys, x <- xs]
     where 
         xs = [0 .. screenWidth-1 ]
         ys = [0 .. screenHeight-1]
-        chooseMonochromeSymbol coordPair = if coordPair `elem` pixelsToPaint --
-            then replicate 2 defaultColorSymbol
-            else replicate 2 defaultBackgroundColorSymbol
+        chooseMonochromeSymbol coordPair = if coordPair `elem` pixelsToPaint
+            then defaultColor
+            else defaultBackgroundColor
 
 monochromeFrame :: [(Int, Int)] -> [String]
 monochromeFrame pixelsToPaint = [line y | y <- [0..screenHeight-1]]
-    where line y = concat [
-            thrd pixel | pixel <- monochromeScreen pixelsToPaint, scnd pixel == y
+    where line y = [
+            symbol | 
+            pixel@(_, _, MakeColor symbol) <- monochromeScreen pixelsToPaint,
+            scnd pixel == y
             ]
 
 
 ----------------------- MULTICOLOR IMPLEMENTATION ------------------------------
-line' :: Int -> [(Int, Int, String)] -> [(Int, Int, String)]
-line' lineY rawColoredPixels = [
-    if pixelWasColored x then symbolFromColoredPixel x else symbolFromBackgroundPixel x | x <- screenXs --ВЗЯЛ ЛИСТ В ЛИСТ И СОСАЛ ПОЛЧАСА
+
+
+line' :: Int -> [Pixel] -> [Pixel]
+line' y rawColoredPixels = [
+    if pixelWasColored x then coloredPixel x else backgroundPixel x | x <- screenXs --ВЗЯЛ ЛИСТ В ЛИСТ И СОСАЛ ПОЛЧАСА
     ]
     where
-        rawColoredPixelsInLine lineY = --filtering by pixel.y
-            [(x, y, color) | (x, y, color) <- rawColoredPixels, y == lineY]
+        pt x = MakePoint x y
+        rawColoredPixelsInLine y = --filtering by pixel.y
+            [px | px <- rawColoredPixels, getY (coords px) == y]
         pixelWasColored x = 
-            (x, lineY) `elem` pixelsCoords (rawColoredPixelsInLine lineY)
-        symbolFromColoredPixel x =
-            (x, lineY, colorOfPoint (x, lineY) (rawColoredPixelsInLine lineY))
-        symbolFromBackgroundPixel x =
-            (x, lineY, replicate 2 backgroundColorSymbol)
+            (pt x) `elem` (map coords (rawColoredPixelsInLine y))
+        coloredPixel x = 
+            MakePixel (pt x) (colorInThePoint (pt x) (rawColoredPixelsInLine y))
+        backgroundPixel x = 
+            MakePixel (pt x) backgroundColor
         
--- sort by line. Then sort by x_pos in line and remove duplicates
-formPixelMatrix :: [(Int, Int, String)] -> [[(Int, Int, String)]]
+formPixelMatrix :: [Pixel] -> [[Pixel]]
 formPixelMatrix rawColoredPixels = [line' y rawColoredPixels | y <- screenYs]
         -- first pixel that matches (x0, y0) coords is chosen.
         -- So pixel in (x0, y0) will be painted in correspondent color
 
-formStrings :: [[(Int, Int, String)]] -> [String]
-formStrings pixelmatrix = [concat $ symbols pixelLine | pixelLine <- pixelmatrix]
-    where symbols pixels = [symbol | (_, _, symbol) <- pixels]
+formStrings :: [[Pixel]] -> [String]
+formStrings pixelMatrix = 
+    [map (symbol . color) pixelLine | pixelLine <- pixelMatrix] -- ДЫААААААА
 
-frame :: [[(Int, Int, String)]] -> String
+frame :: [[Pixel]] -> String
 frame figures = unlines $ formStrings $ formPixelMatrix $ concat figures
 
 

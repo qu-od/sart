@@ -1,23 +1,41 @@
-import Painter as Pntr ( frame, paint )
-import Shapes as Shps ( road, box )
+import Painter
+    ( Point (MakePoint)
+    , Color (MakeColor)
+    , Pixel (MakePixel)
+    , frame
+    , paint
+    )
+
+import Shapes 
+    ( Shape (MakeShape)
+    , road
+    , box
+    )
 
 -------------------------- QUESTIONS -------------------------------------------
 -- how do you choose between let, where, guards, cases, ifs and matternmatching?
+-- $ и . с чем едят
+-- Куда класть определения типов с конструкторами. В отдельный модуль?
+--
 
 ------------------------------- TODO ------------------------------------------
 -- figure out the rules of indentation and multiline expressions
--- learn to make my own types and type constructors
 -- how to make exceptions for special cases? (pattern matching and guards will help)
--- $ ?????
+-- optimize frame rendering with kewl alghorithms
+--
 
+
+----------------------------------- TYPES --------------------------------------
+data Figure = MakeFigure Color Shape
 
 --------------------------- FUNCS FOR MAIN -------------------------------------
 
 
 ----------------------------- MAIN ---------------------------------------------
-figures :: [[(Int, Int, String)]]
+
+figures :: [[Pixel]]
 figures = [
-    paint '#' (box (2, 2) (10, 5)),
+    paint ';' (box (2, 2) (10, 5)),
     paint '=' (box (5, 4) (30, 4)),
     paint '!' (road (40, 4) (45, 4)),
     paint '%' (road (5, 0) (30, 0)),
