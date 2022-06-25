@@ -2,7 +2,7 @@ import Painter
     ( Point (MakePoint)
     , Color (MakeColor)
     , Pixel (MakePixel)
-    , frame
+    , frame01
     , paint
     )
 
@@ -42,7 +42,7 @@ data Figure = MakeFigure Color Shape
 ----------------------------- MAIN ---------------------------------------------
 --alias
 pt :: Int -> Int -> Point
-pt x y = MakePoint x y
+pt = MakePoint
 
 ptt :: (Int, Int) -> Point
 ptt (x, y) = MakePoint x y
@@ -61,34 +61,28 @@ testPoints = map ptt [
 figures :: [[Pixel]]
 figures = [ -- leading elements have higher priority in rendering
     building (pt 20 0) (pt 42 4) "TEST BUILDING 1",
-    building (pt 30 1) (pt 50 4) "TEST BUILdinG 2",
+    building (pt 50 1) (pt 56 4) "бвкяж",
+    building (pt 40 4) (pt 60 6) "TEST BUILdinG 68",
+    building (pt 44 14) (pt 70 19) " в жопе города",
+    building (pt 74 4) (pt 80 6) "БЮБЮБДБД",
     --building (pt 100 3) (pt 120 5) "Aboba",
-    street (pt 150 3) (pt 120 3) "Trahova",
+    street (pt 150 3) (pt 120 3) "Tаrhun",
     street (pt 100 5) (pt 150 5) "Svobody",
     street (pt 120 0) (pt 120 5) "Vo",
     street (pt 150 2) (pt 399 2) "TUPIKOVYI TYPIK",
-    paint ';' (box (2, 2) (10, 5)),
-    paint '=' (box (5, 4) (30, 4)),
-    paint '!' (line (40, 4) (45, 4)),
-    paint '%' (line (5, 0) (30, 0)),
-    paint ')' (line (5, 1) (30, 1)),
-    paint '(' (line (25, 2) (30, 2)),
-    paint 'Ж' (line (5, 3) (30, 3)),
-    --routePoints '0' [
-    paint '0' (routePoints [
-        testPoints !! 0,
-        testPoints !! 1,
-        testPoints !! 2,
-        testPoints !! 3
-    ]),
-    --routePoints '4' [ --ШЬЗДУЬУТЕ
-    paint '4' (routePoints [
-        testPoints !! 3,
-        testPoints !! 4,
-        testPoints !! 5,
-        testPoints !! 6
-    ])
+    street (pt 171 2) (pt 228 2) "автбобус",
+    paint '7' $ box (2, 2) (10, 5),
+    paint '5' $ box (5, 4) (30, 4),
+    paint 'g' $ line (40, 4) (45, 4),
+    paint 'o' $ line (5, 0) (30, 0),
+    paint 'g' $ line (5, 1) (30, 1),
+    paint 'У' $ line (25, 2) (30, 2),
+    paint 'Ж' $ line (5, 3) (30, 3),
+    paint 'H' $ routePoints $ zipWith pt [40, 44, 44] [4, 4, 14],
+    paint '0' $ routePoints $ zipWith pt [136, 149, 149, 10] [2, 2, 6, 6],
+    paint '4' $ routePoints $ zipWith pt [10, 10, 134, 134] [6, 4, 4, 1]
     ]
+    
 
 renderFrame :: IO ()
-renderFrame = putStr $ frame figures
+renderFrame = putStr $ frame01 figures

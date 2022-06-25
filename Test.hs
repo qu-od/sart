@@ -88,3 +88,48 @@ elem' _ [] = False
 elem' item (x:xs)
     | item == x = True
     | otherwise = elem' item xs
+
+
+------------------------ PARTIAL APPLICATION -----------------------------------
+
+multThreeNumsTogether :: (Num a) => a -> (a -> (a -> (a)))
+multThreeNumsTogether x y z = x * y * z
+
+addThirty' :: (Num a) => a -> a
+addThirty' x = (+) 30 x
+
+addThirty :: (Num a) => a -> a
+addThirty = (+) 30
+
+subctFrom10 :: (Num a) => a -> a
+subctFrom10 = (-) 10
+
+subct10 :: (Num a) => a -> a
+subct10 = (flip (-)) 10 -- WTF THOSE PARENS ARE REDUNDANT??!
+
+listOfMultiplications :: (Enum a, Num a) => [a -> a]
+listOfMultiplications = map (*) [0..]
+
+zipWith' :: (Enum a, Enum b, Enum c) => (a -> b -> c) -> [a] -> [b] -> [c]
+zipWith' _ [] _ = []
+zipWith' _ _ [] = []
+zipWith' f (x:xs) (y:ys) = f x y : zipWith' f xs ys
+
+doTwice :: (a -> a) -> (a -> a)
+doTwice f = f . f  --NEED TESTING!
+
+quickSort' :: (Ord a) => [a] -> [a]
+quickSort' [] = []
+quickSort' [x] = [x]
+quickSort' (pivot:xs) = sortedLessers ++ [pivot] ++ sortedGreaters
+    where
+        sortedLessers  = quickSort' [x | x <- xs, x <= pivot]
+        sortedGreaters = quickSort' [x | x <- xs, x > pivot]
+
+quickSort'' :: (Ord a) => [a] -> [a]
+quickSort'' [] = []
+quickSort'' [x] = [x]
+quickSort'' (pivot:xs) = sortedLessers ++ [pivot] ++ sortedGreaters
+    where
+        sortedLessers  = quickSort' $ filter (<= pivot) xs
+        sortedGreaters = quickSort' $ filter (>  pivot) xs

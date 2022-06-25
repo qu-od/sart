@@ -11,7 +11,7 @@ import Painter
     , Color (MakeColor)
     , Pixel (MakePixel)
     )
------------------------GENERALIZED VECTOR SHAPES -------------------------------
+----------------- GENERALIZED VECTOR SHAPES (deprecated) -----------------------
 
 -- shapes:
     -- line (two points)
@@ -65,11 +65,11 @@ buildingBodyColor :: Color
 buildingBodyColor = MakeColor ' '
 
 repaintWithString :: String -> [Pixel] -> [Pixel]
-repaintWithString textToPaintWith points
-    --[MakePixel pt (MakeColor symbol) | ((MakePixel pt _), symbol) <- zip points textToPaintWith]
-    | length textToPaintWith /= length points =
-       error "Len of points doesn't match with len of string to paint with"
-    | otherwise = [MakePixel pt (MakeColor symbol) | ((MakePixel pt _), symbol) <- zip points textToPaintWith]
+repaintWithString textToPaintWith points = 
+    [MakePixel pt (MakeColor symbol) | (MakePixel pt _, symbol) <- zip points textToPaintWith]
+    -- GUARD length textToPaintWith /= length points =
+       -- error "Len of points doesn't match with len of string to paint with"
+    -- GUARD otherwise = [MakePixel pt (MakeColor symbol) | ((MakePixel pt _), symbol) <- zip points textToPaintWith]
 
 --RENDER NAME IN THE CENTER NOT IN THE CORNER
 building :: Point -> Point -> String -> [Pixel] -- map composed func to every (x, y)
@@ -80,7 +80,7 @@ building (MakePoint x1 y1) (MakePoint x2 y2) name =
         [(min x1 x2, y) | y <- choppedYs], -- left wall
         [(max x1 x2, y) | y <- choppedYs] -- right wall
     ]) ++ 
-    addNameToBody (map (paintBody . point) [(x, y) | y <- choppedYs, x <- choppedXs]) -- inner points
+    addNameToBody [(paintBody . point) (x, y) | y <- choppedYs, x <- choppedXs] -- inner points
     where
         len = length
         xs = ordRange x1 x2
