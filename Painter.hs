@@ -59,12 +59,11 @@ concatStrings accumulator strings =
 paint :: Char -> [Point] -> [Pixel]
 paint symbol points = [MakePixel pt (MakeColor symbol) | pt <- points]
 
---pixelsCoords :: [Pixel] -> [Point] --стало ненужно))0
---pixelsCoords pixels = [coords px | px <- pixels]
-
-colorInThePoint :: Point -> [Pixel] -> Color
-colorInThePoint point pixels = color (pixels !! i)
-    where i = findIndexOfTheFirstMatch point (map coords pixels)
+colorInThePoint :: HasCallStack => Point -> [Pixel] -> Color
+colorInThePoint point pixels = color $ pixels !! i
+    where
+    i = fromMaybe (error "Elem doesn't exist") $
+            elemIndex point (map coords pixels)
 
 
 ---------------------------- MONOCHROME SCREEN ---------------------------------
