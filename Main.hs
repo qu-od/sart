@@ -45,7 +45,7 @@ pt :: Int -> Int -> Point
 pt = MakePoint
 
 ptt :: (Int, Int) -> Point
-ptt (x, y) = MakePoint x y
+ptt = uncurry MakePoint
 
 testPoints :: [Point]
 testPoints = map ptt [
