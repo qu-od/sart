@@ -56,20 +56,8 @@ concatStrings accumulator [] = accumulator --breaks the loop
 concatStrings accumulator strings = 
     concatStrings (accumulator ++ head strings) (tail strings) --ordinary iteration
 
-findIndexOfTheFirstMatch :: (Eq a) => a -> [a] -> Int
-findIndexOfTheFirstMatch x xs = 
-    head [i | i <- [0 .. length xs - 1], xs !! i == x]
-
-myStoneSortWithDupesDeletion :: [Int] -> [Int] -> [Int] -- пока не понадобилось для версии 0.0.3
-myStoneSortWithDupesDeletion sorted [] = sorted
-myStoneSortWithDupesDeletion sorted unsorted = 
-    myStoneSortWithDupesDeletion (bubble:sorted) (headingPart ++ trailingPart)
-    where
-        bubble = maximum unsorted
-        holeIndex = findIndexOfTheFirstMatch bubble unsorted
-        headingPart = take holeIndex unsorted 
-        trailingPart = drop (holeIndex + 1) unsorted
-        updatedSorted = if bubble /= head sorted then bubble:sorted else sorted
+myStoneSortWithDupesDeletion :: [Int] -> [Int] -- пока не понадобилось для версии 0.0.3
+myStoneSortWithDupesDeletion = nub . sort
 
 paint :: Char -> [Point] -> [Pixel]
 paint symbol points = [MakePixel pt (MakeColor symbol) | pt <- points]
