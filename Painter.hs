@@ -56,9 +56,6 @@ concatStrings accumulator [] = accumulator --breaks the loop
 concatStrings accumulator strings = 
     concatStrings (accumulator ++ head strings) (tail strings) --ordinary iteration
 
-myStoneSortWithDupesDeletion :: [Int] -> [Int] -- пока не понадобилось для версии 0.0.3
-myStoneSortWithDupesDeletion = nub . sort
-
 paint :: Char -> [Point] -> [Pixel]
 paint symbol points = [MakePixel pt (MakeColor symbol) | pt <- points]
 
