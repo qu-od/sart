@@ -49,13 +49,6 @@ scnd (_, y, _) = y
 thrd :: (a, b, c) -> c
 thrd (_, _, z) = z
 
--- Use foldl instead
-concatStrings :: String -> [String] -> String
-concatStrings accumulator [] = accumulator --breaks the loop
---concatStrings "" strings = concatStrings ("" ++ head strings) (tail strings) --starts folding CAN BE REMOVED
-concatStrings accumulator strings = 
-    concatStrings (accumulator ++ head strings) (tail strings) --ordinary iteration
-
 paint :: Char -> [Point] -> [Pixel]
 paint symbol points = [MakePixel pt (MakeColor symbol) | pt <- points]
 
