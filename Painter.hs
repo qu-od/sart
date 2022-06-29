@@ -15,9 +15,9 @@ import Data.Function (on)
 --------------------------------- TYPES ----------------------------------------
 data Point = MakePoint {getX :: Int, getY :: Int} deriving (Show, Eq, Ord)
 
-data Color = MakeColor {symbol :: Char} deriving (Show)
+data Color = MakeColor {symbol :: Char} deriving (Show,Eq)
 
-data Pixel = MakePixel {coords :: Point, color :: Color} deriving (Show)
+data Pixel = MakePixel {coords :: Point, color :: Color} deriving (Show,Eq)
 
 
 --------------------------------- CONSTS ---------------------------------------
