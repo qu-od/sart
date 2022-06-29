@@ -71,9 +71,9 @@ monochromeScreen pixelsToPaint =
   , x <- screenXs
   , let p = MakePoint x y]
     where 
-        chooseMonochromeSymbol coordPair = if coordPair `elem` pixelsToPaint
-            then defaultColor
-            else defaultBackgroundColor
+        chooseMonochromeSymbol coordPair
+            | coordPair `elem` pixelsToPaint = defaultColor
+            | otherwise = defaultBackgroundColor
 
 monochromeFrame :: [Point] -> [String]
 monochromeFrame pixelsToPaint = line <$> [0..screenHeight-1]
