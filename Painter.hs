@@ -171,7 +171,7 @@ pixelsLineToString :: [Pixel] -> String
 pixelsLineToString = foldMap (pure . symbol . color)
 
 matrixToString :: [[Pixel]] -> String
-matrixToString pxsMatrix = unlines $ map pixelsLineToString pxsMatrix
+matrixToString = unlines . fmap pixelsLineToString
 
 frame01 :: [[Pixel]] -> String
 frame01 figures = 
