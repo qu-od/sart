@@ -19,6 +19,9 @@ data Color = MakeColor {symbol :: Char} deriving (Show,Eq)
 
 data Pixel = MakePixel {coords :: Point, color :: Color} deriving (Show,Eq)
 
+-- Assuming that only coordinates determines an order of pixels, not color
+instance Ord Pixel where
+    compare = compare `on` coords
 
 --------------------------------- CONSTS ---------------------------------------
 screenWidth :: Int
