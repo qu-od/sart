@@ -6,9 +6,10 @@ module Painter
 , frame01
 , paint
 ) where
-import Data.List (elemIndex)
+import Data.List (elemIndex, groupBy)
 import GHC.Stack (HasCallStack)
 import Data.Maybe (fromMaybe)
+import Data.Function (on)
 
 
 --------------------------------- TYPES ----------------------------------------
@@ -163,14 +164,9 @@ dropOutOfBoundsPixels =
     filter $ \(coords -> pos) ->
         getX pos < screenWidth && getY pos < screenHeight
 
--- NEED TESTING!
+
 frameMatrix :: [Pixel] -> [[Pixel]]
-frameMatrix [] = [[]] --NEED FIX PROBABLY!
-frameMatrix [pxN] = [[pxN]] --NEED FIX PROBABLY!
-frameMatrix (px0:px1:pxs)
-    | isLineContinues = (px0 : head (frameMatrix (px1:pxs))) : drop 1 (frameMatrix (px1:pxs)) --same line continued
-    | otherwise = [px0] : frameMatrix (px1:pxs) --new line started
-    where isLineContinues = getY (coords px0) == getY (coords px1)
+frameMatrix = groupBy ((/=) `on` getY . coords)
 
 pixelsLineToString :: [Pixel] -> String
 pixelsLineToString = foldMap (pure . symbol . color)
