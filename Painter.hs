@@ -159,7 +159,8 @@ arrangePixels (pivotPx:pxs) = lesserPixels ++ [pivotPx] ++ greaterPixels
 
 dropOutOfBoundsPixels :: [Pixel] -> [Pixel]
 dropOutOfBoundsPixels =
-    filter $ \px -> (getX (coords px) < screenWidth) && (getY (coords px) < screenHeight)
+    filter $ \px ->
+        getX (coords px) < screenWidth && getY (coords px) < screenHeight
 
 -- NEED TESTING!
 frameMatrix :: [Pixel] -> [[Pixel]]
