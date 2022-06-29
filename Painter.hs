@@ -164,7 +164,6 @@ dropOutOfBoundsPixels =
     filter $ \(coords -> pos) ->
         getX pos < screenWidth && getY pos < screenHeight
 
-
 frameMatrix :: [Pixel] -> [[Pixel]]
 frameMatrix = groupBy ((/=) `on` getY . coords)
 
@@ -184,3 +183,20 @@ frame01 figures =
     $ figures ++ [backgroundPixels]
 
 
+myPixels :: [Pixel]
+myPixels =
+    [ pix 0 0 '#'
+    , pix 0 1 'k'
+    , pix 0 2 's'
+    , pix 1 0 'G'
+    , pix 1 2 'Q'
+    ]
+    where
+        pix x y sym = MakePixel (MakePoint x y) (MakeColor sym)
+
+prettyPixel :: Pixel -> String
+prettyPixel (MakePixel (MakePoint x y) (MakeColor color)) =
+    concat [show x, ":", show y, " ", [color]]
+
+printMatrix :: [Pixel] -> IO ()
+printMatrix = traverse_ (print . fmap prettyPixel) . frameMatrix
