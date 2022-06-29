@@ -5,7 +5,9 @@ module Painter
 , frame01
 , paint
 ) where
-import Data.List (nub)
+import Data.List (elemIndex)
+import GHC.Stack (HasCallStack)
+import Data.Maybe (fromMaybe)
 
 
 --------------------------------- TYPES ----------------------------------------
