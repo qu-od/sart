@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 module Painter
 ( Point (MakePoint)
 , Color (MakeColor)
@@ -159,8 +160,8 @@ arrangePixels (pivotPx:pxs) = lesserPixels ++ [pivotPx] ++ greaterPixels
 
 dropOutOfBoundsPixels :: [Pixel] -> [Pixel]
 dropOutOfBoundsPixels =
-    filter $ \px ->
-        getX (coords px) < screenWidth && getY (coords px) < screenHeight
+    filter $ \(coords -> pos) ->
+        getX pos < screenWidth && getY pos < screenHeight
 
 -- NEED TESTING!
 frameMatrix :: [Pixel] -> [[Pixel]]
