@@ -178,6 +178,11 @@ matrixToString pxsMatrix = unlines $ map pixelsLineToString pxsMatrix
 
 frame01 :: [[Pixel]] -> String
 frame01 figures = 
-    matrixToString . frameMatrix . arrangePixels . dropOutOfBoundsPixels . concat $ figures ++ [backgroundPixels]
+    matrixToString 
+    . frameMatrix 
+    . arrangePixels 
+    . dropOutOfBoundsPixels 
+    . concat 
+    $ figures ++ [backgroundPixels]
 
 
