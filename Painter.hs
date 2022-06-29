@@ -150,17 +150,10 @@ quickSortWithDupesDeletion (pivot:xs) = lessers ++ [pivot] ++ greaters
         lessers  = quickSortWithDupesDeletion (filter (<pivot) xs)
         greaters = quickSortWithDupesDeletion (filter (>pivot) xs)
 
--- arrangePixels is a pixel quicksort by a coords tuple with dupes removal
+-- | Sort and nub pixels. Hopefully more performant than `nub . sort`.
+-- If not, do contribute to Data.List.
 arrangePixels :: [Pixel] -> [Pixel]
-arrangePixels [] = []
-arrangePixels [px] = [px]
-arrangePixels (pivotPx:pxs) = lesserPixels ++ [pivotPx] ++ greaterPixels
-    where
-        yx (MakePixel (MakePoint x y) _)  = (y, x) --cuz we need to reverse coordss
-        lesserPixels =
-            arrangePixels $ filter (\px -> yx px < yx pivotPx) pxs
-        greaterPixels =
-            arrangePixels $ filter (\px -> yx px > yx pivotPx) pxs
+arrangePixels = toList . Set.fromList
 
 dropOutOfBoundsPixels :: [Pixel] -> [Pixel]
 dropOutOfBoundsPixels =
