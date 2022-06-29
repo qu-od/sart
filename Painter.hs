@@ -49,8 +49,8 @@ scnd (_, y, _) = y
 thrd :: (a, b, c) -> c
 thrd (_, _, z) = z
 
-paint :: Char -> [Point] -> [Pixel]
-paint symbol points = [MakePixel pt (MakeColor symbol) | pt <- points]
+paint :: Functor f => Char -> f Point -> f Pixel
+paint = fmap . flip MakePixel .  MakeColor
 
 colorInThePoint :: HasCallStack => Point -> [Pixel] -> Color
 colorInThePoint point pixels = color $ pixels !! i
