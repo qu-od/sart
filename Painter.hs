@@ -80,7 +80,8 @@ monochromeFrame pixelsToPaint = line <$> [0..screenHeight-1]
     where 
         line y =
             [symbol
-            | pixel@(MakePixel p (MakeColor symbol)) <- monochromeScreen pixelsToPaint
+            | pixel@(MakePixel p (MakeColor symbol))
+                <- monochromeScreen pixelsToPaint
             , getX p == y
             ]
 
