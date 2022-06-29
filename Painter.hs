@@ -62,22 +62,24 @@ colorInThePoint point pixels = color $ pixels !! i
 ---------------------------- MONOCHROME SCREEN ---------------------------------
 -- func monochromeScreen paints points turning them into pixels.
     -- Since it's monochrome, there is only one color to paint with
-monochromeScreen :: [(Int, Int)] -> [(Int, Int, Color)]
+monochromeScreen :: [Point] -> [Pixel]
 monochromeScreen pixelsToPaint = 
-  [(x, y, chooseMonochromeSymbol (x, y)) | y <- ys, x <- xs]
+  [MakePixel p $ chooseMonochromeSymbol p
+  | y <- screenYs
+  , x <- screenXs
+  , let p = MakePoint x y]
     where 
-        xs = [0 .. screenWidth-1 ]
-        ys = [0 .. screenHeight-1]
         chooseMonochromeSymbol coordPair = if coordPair `elem` pixelsToPaint
             then defaultColor
             else defaultBackgroundColor
 
-monochromeFrame :: [(Int, Int)] -> [String]
-monochromeFrame pixelsToPaint = [line y | y <- [0..screenHeight-1]]
-    where line y = [
-            symbol | 
-            pixel@(_, _, MakeColor symbol) <- monochromeScreen pixelsToPaint,
-            scnd pixel == y
+monochromeFrame :: [Point] -> [String]
+monochromeFrame pixelsToPaint = line <$> [0..screenHeight-1]
+    where 
+        line y =
+            [symbol
+            | pixel@(MakePixel p (MakeColor symbol)) <- monochromeScreen pixelsToPaint
+            , getX p == y
             ]
 
 
