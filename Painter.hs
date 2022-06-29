@@ -170,8 +170,7 @@ frameMatrix (px0:px1:pxs)
     where isLineContinues = getY (coords px0) == getY (coords px1)
 
 pixelsLineToString :: [Pixel] -> String
-pixelsLineToString = foldr (\px acc -> symbol (color px):acc) ""
---pixelsLineToString = foldr (\(MakePixel _ (MakeColor symbol)) acc -> symbol:acc) "" --suboptimal variant
+pixelsLineToString = foldMap (pure . symbol . color)
 
 matrixToString :: [[Pixel]] -> String
 matrixToString pxsMatrix = unlines $ map pixelsLineToString pxsMatrix
