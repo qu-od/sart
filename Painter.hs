@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 module Painter
 ( Point (MakePoint)
 , Color (MakeColor)
@@ -5,7 +6,10 @@ module Painter
 , frame01
 , paint
 ) where
-import Data.List (nub)
+import Data.List (elemIndex, groupBy)
+import GHC.Stack (HasCallStack)
+import Data.Maybe (fromMaybe)
+import Data.Function (on)
 
 
 --------------------------------- TYPES ----------------------------------------
@@ -49,58 +53,38 @@ scnd (_, y, _) = y
 thrd :: (a, b, c) -> c
 thrd (_, _, z) = z
 
--- Use foldl instead
-concatStrings :: String -> [String] -> String
-concatStrings accumulator [] = accumulator --breaks the loop
---concatStrings "" strings = concatStrings ("" ++ head strings) (tail strings) --starts folding CAN BE REMOVED
-concatStrings accumulator strings = 
-    concatStrings (accumulator ++ head strings) (tail strings) --ordinary iteration
+paint :: Functor f => Char -> f Point -> f Pixel
+paint = fmap . flip MakePixel .  MakeColor
 
-findIndexOfTheFirstMatch :: (Eq a) => a -> [a] -> Int
-findIndexOfTheFirstMatch x xs = 
-    head [i | i <- [0 .. length xs - 1], xs !! i == x]
-
-myStoneSortWithDupesDeletion :: [Int] -> [Int] -> [Int] -- пока не понадобилось для версии 0.0.3
-myStoneSortWithDupesDeletion sorted [] = sorted
-myStoneSortWithDupesDeletion sorted unsorted = 
-    myStoneSortWithDupesDeletion (bubble:sorted) (headingPart ++ trailingPart)
+colorInThePoint :: HasCallStack => Point -> [Pixel] -> Color
+colorInThePoint point pixels = color $ pixels !! i
     where
-        bubble = maximum unsorted
-        holeIndex = findIndexOfTheFirstMatch bubble unsorted
-        headingPart = take holeIndex unsorted 
-        trailingPart = drop (holeIndex + 1) unsorted
-        updatedSorted = if bubble /= head sorted then bubble:sorted else sorted
-
-paint :: Char -> [Point] -> [Pixel]
-paint symbol points = [MakePixel pt (MakeColor symbol) | pt <- points]
-
---pixelsCoords :: [Pixel] -> [Point] --стало ненужно))0
---pixelsCoords pixels = [coords px | px <- pixels]
-
-colorInThePoint :: Point -> [Pixel] -> Color
-colorInThePoint point pixels = color (pixels !! i)
-    where i = findIndexOfTheFirstMatch point (map coords pixels)
+    i = fromMaybe (error "Elem doesn't exist") $
+            elemIndex point (map coords pixels)
 
 
 ---------------------------- MONOCHROME SCREEN ---------------------------------
 -- func monochromeScreen paints points turning them into pixels.
     -- Since it's monochrome, there is only one color to paint with
-monochromeScreen :: [(Int, Int)] -> [(Int, Int, Color)]
+monochromeScreen :: [Point] -> [Pixel]
 monochromeScreen pixelsToPaint = 
-  [(x, y, chooseMonochromeSymbol (x, y)) | y <- ys, x <- xs]
+  [MakePixel p $ chooseMonochromeSymbol p
+  | y <- screenYs
+  , x <- screenXs
+  , let p = MakePoint x y]
     where 
-        xs = [0 .. screenWidth-1 ]
-        ys = [0 .. screenHeight-1]
-        chooseMonochromeSymbol coordPair = if coordPair `elem` pixelsToPaint
-            then defaultColor
-            else defaultBackgroundColor
+        chooseMonochromeSymbol coordPair
+            | coordPair `elem` pixelsToPaint = defaultColor
+            | otherwise = defaultBackgroundColor
 
-monochromeFrame :: [(Int, Int)] -> [String]
-monochromeFrame pixelsToPaint = [line y | y <- [0..screenHeight-1]]
-    where line y = [
-            symbol | 
-            pixel@(_, _, MakeColor symbol) <- monochromeScreen pixelsToPaint,
-            scnd pixel == y
+monochromeFrame :: [Point] -> [String]
+monochromeFrame pixelsToPaint = line <$> [0..screenHeight-1]
+    where 
+        line y =
+            [symbol
+            | pixel@(MakePixel p (MakeColor symbol))
+                <- monochromeScreen pixelsToPaint
+            , getX p == y
             ]
 
 
@@ -177,26 +161,42 @@ arrangePixels (pivotPx:pxs) = lesserPixels ++ [pivotPx] ++ greaterPixels
 
 dropOutOfBoundsPixels :: [Pixel] -> [Pixel]
 dropOutOfBoundsPixels =
-    filter $ \px -> (getX (coords px) < screenWidth) && (getY (coords px) < screenHeight)
+    filter $ \(coords -> pos) ->
+        getX pos < screenWidth && getY pos < screenHeight
 
--- NEED TESTING!
 frameMatrix :: [Pixel] -> [[Pixel]]
-frameMatrix [] = [[]] --NEED FIX PROBABLY!
-frameMatrix [pxN] = [[pxN]] --NEED FIX PROBABLY!
-frameMatrix (px0:px1:pxs)
-    | isLineContinues = (px0 : head (frameMatrix (px1:pxs))) : drop 1 (frameMatrix (px1:pxs)) --same line continued
-    | otherwise = [px0] : frameMatrix (px1:pxs) --new line started
-    where isLineContinues = getY (coords px0) == getY (coords px1)
+frameMatrix = groupBy ((/=) `on` getY . coords)
 
 pixelsLineToString :: [Pixel] -> String
-pixelsLineToString = foldr (\px acc -> symbol (color px):acc) ""
---pixelsLineToString = foldr (\(MakePixel _ (MakeColor symbol)) acc -> symbol:acc) "" --suboptimal variant
+pixelsLineToString = foldMap (pure . symbol . color)
 
 matrixToString :: [[Pixel]] -> String
-matrixToString pxsMatrix = unlines $ map pixelsLineToString pxsMatrix
+matrixToString = unlines . fmap pixelsLineToString
 
 frame01 :: [[Pixel]] -> String
 frame01 figures = 
-    matrixToString . frameMatrix . arrangePixels . dropOutOfBoundsPixels . concat $ figures ++ [backgroundPixels]
+    matrixToString 
+    . frameMatrix 
+    . arrangePixels 
+    . dropOutOfBoundsPixels 
+    . concat 
+    $ figures ++ [backgroundPixels]
 
 
+myPixels :: [Pixel]
+myPixels =
+    [ pix 0 0 '#'
+    , pix 0 1 'k'
+    , pix 0 2 's'
+    , pix 1 0 'G'
+    , pix 1 2 'Q'
+    ]
+    where
+        pix x y sym = MakePixel (MakePoint x y) (MakeColor sym)
+
+prettyPixel :: Pixel -> String
+prettyPixel (MakePixel (MakePoint x y) (MakeColor color)) =
+    concat [show x, ":", show y, " ", [color]]
+
+printMatrix :: [Pixel] -> IO ()
+printMatrix = traverse_ (print . fmap prettyPixel) . frameMatrix
