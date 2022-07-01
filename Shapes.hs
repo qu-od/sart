@@ -126,25 +126,28 @@ middle xs = (length xs) `div` 2
 
 --RENDER NAME IN THE CENTER NOT IN THE BEGINNING
 street :: forall n. (Ord n, Enum n) => Point n -> Point n -> String -> Pixels n Char
-street (MakePoint x1 y1) (MakePoint x2 y2) rawName =
-    tryToRenderName $ Map.fromSet (const streetColor) rawStreet
+street (MakePoint x1 y1) (MakePoint x2 y2) rawName = renderResult
     where
         rawStreet = line (x1,y1) (x2,y2)
-        name = rawName ++ " st."
+        name = " " ++ rawName ++ " st." ++ " "
         offset = (length rawStreet - length name) `div` 2
 
-        repaintStartIndex pixels = middle pixels - middle name
-        repaintStopIndex pixels  = middle pixels + middle name
+        repaintStartIndex = offset
+        repaintStopIndex = offset + length name
 
-        tryToRenderName :: Pixels n Char -> Pixels n Char      
-        tryToRenderName pixels
-            | (length pixels >= length name + 4) = undefined -- Why 4?
-            --  concat [ --OPTIMIZE DEFINITION!
-            
-            --     take (repaintStartIndex pixels) pixels,
-            --     repaintWithString (" " ++ name ++ " ") (drop (repaintStartIndex pixels) (take ((repaintStopIndex pixels) + 3) pixels)),
-            --     drop (repaintStopIndex pixels + 3) pixels
-            --     ]
+        pixels = Map.fromSet (const streetColor) rawStreet
+
+        renderResult :: Pixels n Char    
+        renderResult
+            | length pixels > length name =
+                let (prefix,(target,postfix)) =
+                        splitAt repaintStopIndex
+                        <$> splitAt repaintStartIndex (Map.assocs pixels)
+                in fold 
+                    [ Map.fromDistinctAscList prefix
+                    , repaintWithString name $ Map.fromDistinctAscList target
+                    , Map.fromDistinctAscList postfix
+                    ]
             | otherwise = pixels
     
 
