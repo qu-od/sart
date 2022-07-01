@@ -3,7 +3,7 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Painter
-( Point (MakePoint)
+( Point (MakePoint,getX,getY)
 , Color (MakeColor)
 , Pixels
 , frame01
