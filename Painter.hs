@@ -1,116 +1,114 @@
-{-# LANGUAGE ViewPatterns, ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wall #-}
+
 module Painter
 ( Point (MakePoint)
 , Color (MakeColor)
 , frame01
+, monochromeScreen
+, monochromeFrame
+, formPixelMatrix
+, formStrings
 ) where
-import Data.List (elemIndex, groupBy)
-import GHC.Stack (HasCallStack)
+import Data.List.NonEmpty (groupBy, NonEmpty ((:|)))
 import Data.Maybe (fromMaybe)
 import Data.Function (on)
-import Data.Foldable (traverse_, Foldable (toList))
+import Data.Foldable (Foldable (toList))
 import qualified Data.Set as Set
 import Data.Set (Set)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Control.Monad (join, forM, when)
 import Control.Arrow (first, Arrow ((&&&)))
-import qualified GHC.Arr as STArr
-import qualified Control.Monad.ST as ST
-import Control.Monad.Fix
-import Data.Monoid (First(First,getFirst))
---------------------------------- TYPES ----------------------------------------
-data Point = MakePoint {getX :: Int, getY :: Int} deriving (Show, Eq, Ord)
 
-data Color = MakeColor {symbol :: Char} deriving (Show,Eq)
+-- * Types
 
-type Pixels = Map Point Color
+data Point n = MakePoint {getX :: n, getY :: n} deriving (Show, Eq, Ord)
 
---------------------------------- CONSTS ---------------------------------------
-screenWidth :: Int
-screenWidth = 100
+data Color a = MakeColor {symbol :: a} deriving (Show,Eq)
 
-screenHeight :: Int
-screenHeight = 11
+type Pixels n a = Map (Point n) (Color a)
 
-backgroundColor :: Color
-backgroundColor = MakeColor '.'
+data Screen coord color = MkScreen
+    { screenWidth :: coord
+    , screenHeight :: coord
+    , defaultBackgroundColor :: Color color
+    , defaultColor :: Color color
+    , backgroundColor :: Color color
+    }
 
-defaultBackgroundColor :: Color
-defaultBackgroundColor = MakeColor '-'
+screenXs :: (Enum n, Num n, Ord n) => Screen n c -> Set n
+screenXs MkScreen {screenWidth} =
+    Set.fromList [0 .. pred screenWidth]
 
-defaultColor :: Color
-defaultColor = MakeColor '@'
+screenYs :: (Enum n, Num n, Ord n) => Screen n c -> Set n
+screenYs MkScreen {screenHeight} =
+    Set.fromList [0 .. pred screenHeight]
 
-screenSize :: (Int, Int)
-screenSize = (screenWidth, screenHeight)
+-- * Monochrome screen
 
-screenXs :: Set Int
-screenXs = Set.fromList [0 .. screenWidth - 1]
-
-screenYs :: Set Int
-screenYs = Set.fromList [0 .. screenHeight - 1]
-
-
---------------------------------- WHEELS ---------------------------------------
-scnd :: (a, b, c) -> b
-scnd (_, y, _) = y
-
-thrd :: (a, b, c) -> c
-thrd (_, _, z) = z
-
-colorInThePoint :: HasCallStack => Point -> Pixels -> Color
-colorInThePoint = (unwrap .) . Map.lookup
-    where
-    unwrap = fromMaybe (error "Elem doesn't exist")
-
----------------------------- MONOCHROME SCREEN ---------------------------------
 -- func monochromeScreen paints points turning them into pixels.
     -- Since it's monochrome, there is only one color to paint with
-monochromeScreen :: Set Point -> Pixels
-monochromeScreen pixelsToPaint =
-    Map.fromSet chooseMonochromeSymbol screenPoints
-    where 
+monochromeScreen :: forall n c.
+    (Enum n, Num n, Ord n) =>
+    Screen n c ->
+    Set (Point n) ->
+    Pixels n c
+monochromeScreen
+    screen@MkScreen {defaultColor,defaultBackgroundColor}
+    pixelsToPaint =
+
+    Map.fromSet chooseMonochromeSymbol (screenPoints screen)
+    where
+        chooseMonochromeSymbol :: Point n -> Color c
         chooseMonochromeSymbol coordPair
             | coordPair `elem` pixelsToPaint = defaultColor
             | otherwise = defaultBackgroundColor
 
-monochromeFrame :: Set Point -> [String]
-monochromeFrame pixelsToPaint = line <$> toList screenYs 
+monochromeFrame ::
+    (Enum n, Num n, Ord n) =>
+    Screen n c ->
+    Set (Point n) ->
+    [[Color c]]
+monochromeFrame screen pixelsToPaint = line <$> toList (screenYs screen)
     where 
         line y =
             toList
-            . Map.map symbol
             . Map.filterWithKey (const . (== y) . getY)
-            $ monochromeScreen pixelsToPaint
+            $ monochromeScreen screen pixelsToPaint
 
------------------------ MULTICOLOR IMPLEMENTATION ------------------------------
-line' :: Int -> Pixels -> Pixels
-line' y rawColoredPixels =
-    Map.fromSet fill $ Set.map (`MakePoint` y) screenXs --ВЗЯЛ ЛИСТ В ЛИСТ И СОСАЛ ПОЛЧАСА
+-- * Multicolor
+
+line' :: forall n c.
+    (Enum n, Num n, Ord n) =>
+    Screen n c ->
+    n ->
+    Pixels n c ->
+    Pixels n c
+line' screen@MkScreen{backgroundColor} y rawColoredPixels =
+    Map.fromSet fill $ Set.map (`MakePoint` y) (screenXs screen) --ВЗЯЛ ЛИСТ В ЛИСТ И СОСАЛ ПОЛЧАСА
     where
-        fill :: Point -> Color
-        fill x
-            | isColored x = colored x
-            | otherwise = background x
+        fill :: Point n -> Color c
+        fill p = fromMaybe backgroundColor $
+            Map.lookup p rawColoredPixelsInLine
 
-        rawColoredPixelsInLine :: Int -> Pixels
-        rawColoredPixelsInLine y = --filtering by pixel.y
+        rawColoredPixelsInLine :: Pixels n c
+        rawColoredPixelsInLine = --filtering by pixel.y
             Map.filterWithKey (const . (==) y . getY) rawColoredPixels
-        
-        isColored = (`Map.member` rawColoredPixelsInLine y)
-        colored p = colorInThePoint p (rawColoredPixelsInLine y)
-        background _ = backgroundColor
 
 type Matrix n a = Map n (Map n a)
 
-formPixelMatrix :: Pixels -> Matrix Int Color
-formPixelMatrix rawColoredPixels = frameMatrix $
-    foldMap (`line'` rawColoredPixels) screenYs
+formPixelMatrix ::
+    (Num n, Enum n, Ord n) =>
+    Screen n c ->
+    Pixels n c ->
+    Matrix n (Color c)
+formPixelMatrix screen rawColoredPixels = frameMatrix $
+    foldMap (flip (line' screen) rawColoredPixels ) (screenYs screen)
 
-formStrings :: Matrix Int Color -> [String]
+formStrings :: Matrix n (Color c) -> [[Color c]]
 formStrings pixelMatrix = 
-    toList $ toList . fmap symbol <$> pixelMatrix -- ДЫААААААА
+    toList $ toList <$> pixelMatrix -- ДЫААААААА
 
 {- | Turns nested maps into a flat map.
  It assumes to be O(n) since preserves order.
@@ -154,12 +152,13 @@ unFlattenMonotonic splitKeys =
             $ groupBy ((/=) `on` fst)
             $ pure . unmerge =<< xs
             
-        withGroup :: [(k0,(k1,a))] -> (k0,[(k1,a)])
-        withGroup xs@((k,_):_) = (k,snd <$> xs)
+        withGroup :: NonEmpty (k0,(k1,a)) -> (k0,[(k1,a)])
+        withGroup xs@((k,_) :| _) = (k,snd <$> toList xs)
 
         unmerge :: (k,a) -> (k0,(k1,a))
         unmerge (splitKeys -> (k0,k1),v) = (k0,(k1,v))
 
+-- TODO: Put in docs
 --------------------- 0.1.0 FRAME IMPLEMENTATION (with HOFs) -------------------
 -- "frame" function alghorithm:
 -- 1. get [figure] (figure = [Pixel]) 
@@ -167,40 +166,52 @@ unFlattenMonotonic splitKeys =
 -- 2. form a matrix from that brushed set of pixels
 -- 3. form one multiline string for the pixels matrix
 
-screenPoints :: Set Point
-screenPoints = Set.map (uncurry MakePoint) $
-    Set.cartesianProduct screenXs screenYs
+screenPoints :: (Enum n, Num n, Ord n) => Screen n c -> Set (Point n)
+screenPoints screen = Set.map (uncurry MakePoint) $
+    Set.cartesianProduct (screenXs screen) (screenYs screen)
 
-backgroundPixels :: Pixels
-backgroundPixels = Map.fromSet (const backgroundColor) screenPoints
+backgroundPixels :: (Enum n, Num n, Ord n) => Screen n c -> Pixels n c
+backgroundPixels screen@MkScreen {backgroundColor} =
+    Map.fromSet (const backgroundColor) (screenPoints screen)
 
-isInBound :: Point -> Bool
-isInBound pos = getX pos < screenWidth && getY pos < screenHeight
+isInBound :: Ord n => Screen n c -> Point n -> Bool
+isInBound MkScreen {screenHeight, screenWidth} pos =
+    getX pos < screenWidth && getY pos < screenHeight
 
-dropOutOfBoundsPixels :: Pixels -> Pixels
-dropOutOfBoundsPixels = Map.filterWithKey (const . isInBound)
+dropOutOfBoundsPixels :: Ord n => Screen n c -> Pixels n c -> Pixels n c
+dropOutOfBoundsPixels screen = Map.filterWithKey (const . isInBound screen)
 
-frameMatrix :: Pixels -> Matrix Int Color
+frameMatrix :: Ord n => Pixels n c -> Matrix n (Color c)
 frameMatrix = unFlattenMonotonic $ getX &&& getY
 
-unMatrix :: Matrix Int Color -> Pixels
+unMatrix :: Ord n => Matrix n (Color c) -> Pixels n c
 unMatrix = flattenMonotonic MakePoint
 
-lineToString :: [Color] -> String
+-- * Concrete stuff
+
+lineToString :: [Color Char] -> String
 lineToString = foldMap (pure . symbol)
 
-matrixToString :: Matrix Int Color -> String
+matrixToString :: Matrix n (Color Char) -> String
 matrixToString = unlines . toList . fmap (lineToString . toList)
 
-frame01 :: Matrix Int Color -> String
+frame01 :: Matrix Int (Color Char) -> String
 frame01 figures = 
     matrixToString 
     . frameMatrix
-    . dropOutOfBoundsPixels 
-    $ Map.union (unMatrix figures) backgroundPixels
+    . dropOutOfBoundsPixels defaultScreen
+    $ Map.union (unMatrix figures) (backgroundPixels defaultScreen)
 
+defaultScreen :: Screen Int Char
+defaultScreen = MkScreen
+    { screenWidth = 100
+    , screenHeight = 11
+    , defaultBackgroundColor = MakeColor '-'
+    , defaultColor = MakeColor '@'
+    , backgroundColor = MakeColor '.'
+    }
 
-myPixels :: Pixels
+myPixels :: Pixels Int Char
 myPixels = Map.fromList
     [ pix 0 0 '#'
     , pix 0 1 'k'
@@ -209,7 +220,7 @@ myPixels = Map.fromList
     , pix 1 2 'Q'
     ]
     where
-        pix :: Int -> Int -> Char -> (Point,Color)
+        pix :: Int -> Int -> Char -> (Point Int,Color Char)
         pix x y sym = (MakePoint x y, MakeColor sym)
 
 -- prettyPixel :: Pixel -> String
