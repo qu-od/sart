@@ -36,6 +36,17 @@ ordRange x1 x2
     | x1 < x2 = [x1..x2]
     | otherwise = [x2..x1]
 
+ordRangeSet :: (Ord a, Enum a) => a -> a -> Set a
+ordRangeSet x1 x2
+    | x1 < x2 = Set.fromDistinctAscList [x1..x2]
+    | otherwise = Set.fromDistinctDescList [x2..x1]
+
+-- | Makes a Set from ascending or descending distinct list 
+setFromDistinctMonotonicList :: Ord a => [a] -> Set a
+setFromDistinctMonotonicList xs@(x0:x1:_)
+    | x0 > x1 = Set.fromDistinctDescList xs
+    | otherwise = Set.fromDistinctAscList xs
+setFromDistinctMonotonicList xs = Set.fromList xs
 
 ------------------------------ SIMPLE (VERT-HORZ) SHAPES -----------------------
 -- road :: Pixel -> Pixel -> [Pixel]
@@ -51,10 +62,11 @@ line (x1, y1) (x2, y2)
 -- road (x1, y1) len "up"    = 
 -- road (x1, y1) len "down"  = 
 
-box :: (Int, Int) -> (Int, Int) -> [Point]
+box :: (Ord n, Enum n) => (n, n) -> (n, n) -> Set (Point n)
 -- types for other args arrangement
 box (x1, y1) (x2, y2) = 
-    [MakePoint x y | x <- [x1 .. x2], y <- [y1 .. y2]]
+    setFromDistinctMonotonicList
+        [MakePoint x y | x <- [x1 .. x2], y <- [y1 .. y2]]
 -- box (x1, x2) width height = 
 
 --------------------------------- BUILDINGS ------------------------------------
