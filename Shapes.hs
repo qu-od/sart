@@ -123,22 +123,26 @@ middle :: [a] -> Int
 middle xs = (length xs) `div` 2
 
 --RENDER NAME IN THE CENTER NOT IN THE BEGINNING
-street :: Point -> Point -> String -> [Pixel]
-street (MakePoint x1 y1) (MakePoint x2 y2) rawName
-    | x1 == x2 = tryToRenderName [MakePixel (MakePoint x1 y) streetColor | y <- ordRange y1 y2] -- vertical road
-    | y1 == y2 = tryToRenderName [MakePixel (MakePoint x y1) streetColor | x <- ordRange x1 x2] -- horizontal road
-    | otherwise = error "this road can be either \
-        \ vertical or horizontal and not a diagonal"
+street :: forall n. (Ord n, Enum n) => Point n -> Point n -> String -> Pixels n Char
+street (MakePoint x1 y1) (MakePoint x2 y2) rawName =
+    tryToRenderName $ Map.fromSet (const streetColor) rawStreet
     where
+        rawStreet = line (x1,y1) (x2,y2)
         name = rawName ++ " st."
-        repaintStartIndex pixels = (middle pixels) - (middle name)
-        repaintStopIndex pixels  = (middle pixels) + (middle name)        
-        tryToRenderName pixels = if (length pixels >= (length name) + 4)
-            then concat [ --OPTIMIZE DEFINITION!
-                take (repaintStartIndex pixels) pixels,
-                repaintWithString (" " ++ name ++ " ") (drop (repaintStartIndex pixels) (take ((repaintStopIndex pixels) + 3) pixels)),
-                drop ((repaintStopIndex pixels) + 3) pixels
-                ]
-            else pixels
+        offset = (length rawStreet - length name) `div` 2
+
+        repaintStartIndex pixels = middle pixels - middle name
+        repaintStopIndex pixels  = middle pixels + middle name
+
+        tryToRenderName :: Pixels n Char -> Pixels n Char      
+        tryToRenderName pixels
+            | (length pixels >= length name + 4) = undefined -- Why 4?
+            --  concat [ --OPTIMIZE DEFINITION!
+            
+            --     take (repaintStartIndex pixels) pixels,
+            --     repaintWithString (" " ++ name ++ " ") (drop (repaintStartIndex pixels) (take ((repaintStopIndex pixels) + 3) pixels)),
+            --     drop (repaintStopIndex pixels + 3) pixels
+            --     ]
+            | otherwise = pixels
     
 
