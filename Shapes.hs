@@ -5,12 +5,14 @@ module Shapes
 , building
 , street
 ) where
-
+import Data.Map qualified as Map
 import Painter
     ( Point (MakePoint)
     , Color (MakeColor)
-    , Pixel (MakePixel)
+    , Pixels
     )
+import Data.Set (Set)
+import qualified Data.Set as Set
 ----------------- GENERALIZED VECTOR SHAPES (deprecated) -----------------------
 
 -- shapes:
