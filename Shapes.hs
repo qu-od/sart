@@ -87,35 +87,25 @@ repaintWithString textToPaintWith =
        -- error "Len of points doesn't match with len of string to paint with"
     -- GUARD otherwise = [MakePixel pt (MakeColor symbol) | ((MakePixel pt _), symbol) <- zip points textToPaintWith]
 
---RENDER NAME IN THE CENTER NOT IN THE CORNER
-building :: Point n -> Point n -> String -> Pixels n c -- map composed func to every (x, y)
-building (MakePoint x1 y1) (MakePoint x2 y2) name = 
-    map (paintWall . point) (concat [
-        [(x, min y1 y2) | x <- xs], -- upper wall --Запятые забыл добавить. Тоже пососал знатно
-        [(x, max y1 y2) | x <- xs], -- lower wall
-        [(min x1 x2, y) | y <- choppedYs], -- left wall
-        [(max x1 x2, y) | y <- choppedYs] -- right wall
-    ]) ++ 
-    addNameToBody [(paintBody . point) (x, y) | y <- choppedYs, x <- choppedXs] -- inner points
-    where
-        len = length
-        xs = ordRange x1 x2
-        ys = ordRange y1 y2
-        choppedXs = (init . tail) xs
-        choppedYs = (init . tail) ys
-        point (x, y) = MakePoint x y
-        --nameStartX xs = (middle xs) - (middle name) --TOOMUCH FOR TODAY
-        --nameStopX xs  = (middle xs) + (middle name)
-        --nameY ys = middle ys
-        --repaintStartIndexInMatrix = 
-        paintWall wallPoint = MakePixel wallPoint buildingWallsColor
-        paintBody bodyPoint = MakePixel bodyPoint buildingBodyColor
-        nameIsRendered = if (len ys >= 3) && (len xs >= (len name) + 2)
-            then True else False
-        addNameToBody pixels = if nameIsRendered
-            then (repaintWithString name (take (len name) pixels)) ++ drop (len name) pixels 
-            else pixels
+mkBuilding :: Integral n => Point n -> Point n -> String -> Pixels n Char
+mkBuilding p0 p1 name =
+    building buildingWallsColor buildingBodyColor p0 p1 (MakeColor <$> name)
 
+building :: Integral n => Color c -> Color c -> Point n -> Point n -> [Color c] -> Pixels n c
+building wallColor floorColor p1@(MakePoint x1 y1) p2@(MakePoint x2 y2) name =
+    Map.union walls innerSpace
+    where
+        walls = flip renderInCenter [name] $
+            Map.fromSet (const wallColor) outerSpacePoints
+        innerSpace = Map.fromSet (const floorColor) innerSpacePoints
+
+        outerSpacePoints = box p1 p2
+        innerSpacePoints =
+            let -- | if a1 is right from a2 then reduce it, else increace
+                decide a1 a2 = if a1 > a2 then pred a1 else succ a1
+                p0' = MakePoint (decide x1 x2) (decide y1 y2)
+                p1' = MakePoint (decide x2 x1) (decide y2 y1) 
+            in box p0' p1'
 
 ---------------------------------- STREETS -------------------------------------
 streetColor :: Color Char
