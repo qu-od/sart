@@ -87,6 +87,26 @@ repaintWithString textToPaintWith =
        -- error "Len of points doesn't match with len of string to paint with"
     -- GUARD otherwise = [MakePixel pt (MakeColor symbol) | ((MakePixel pt _), symbol) <- zip points textToPaintWith]
 
+offsetShape :: Num n => Point n -> Pixels n c -> Pixels n c
+offsetShape (MakePoint x0 y0) =
+    Map.fromDistinctAscList . fmap (first offset) . Map.assocs
+    where
+        offset (MakePoint x y) = MakePoint (x + x0) (y + y0)
+
+drawMatrixFrom :: Enum n => n -> [[Color a]] -> Pixels n a
+drawMatrixFrom _ [] = Map.empty
+drawMatrixFrom zero (firstRow:rows) =
+    Map.fromDistinctAscList $ join $ zipWith
+        (\y row -> zipWith 
+            (\x elem -> (MakePoint x y,elem))
+            shapeXs
+            row
+        )
+        shapeYs
+        rows
+    where
+    shapeXs = [zero..len zero firstRow]
+    shapeYs = [zero..len zero rows]
 
 len :: (Foldable f, Enum n) => n -> f a -> n
 len zero xs = foldl (const . succ) zero xs
