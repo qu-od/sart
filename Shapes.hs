@@ -64,11 +64,11 @@ line (x1, y1) (x2, y2)
 -- road (x1, y1) len "up"    = 
 -- road (x1, y1) len "down"  = 
 
-box :: (Ord n, Enum n) => (n, n) -> (n, n) -> Set (Point n)
+box :: (Ord n, Enum n) => Point n -> Point n -> Set (Point n)
 -- types for other args arrangement
-box (x1, y1) (x2, y2) = 
-    setFromDistinctMonotonicList
-        [MakePoint x y | x <- [x1 .. x2], y <- [y1 .. y2]]
+box (MakePoint x1 y1) (MakePoint x2 y2) = 
+    Set.mapMonotonic (uncurry MakePoint) $
+        Set.cartesianProduct (ordRangeSet x1 x2) (ordRangeSet y1 y2)
 -- box (x1, x2) width height = 
 
 --------------------------------- BUILDINGS ------------------------------------
