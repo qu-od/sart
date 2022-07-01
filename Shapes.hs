@@ -27,7 +27,7 @@ import Painter
 
 
 -------------------------------------- TYPES -----------------------------------
-data Shape = MakeShape [Point] deriving (Show)
+data Shape n = MakeShape [Point n] deriving (Show)
 
 
 ------------------------------------WHEEL FUNCS --------------------------------
