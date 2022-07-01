@@ -87,6 +87,10 @@ repaintWithString textToPaintWith =
        -- error "Len of points doesn't match with len of string to paint with"
     -- GUARD otherwise = [MakePixel pt (MakeColor symbol) | ((MakePixel pt _), symbol) <- zip points textToPaintWith]
 
+
+len :: (Foldable f, Enum n) => n -> f a -> n
+len zero xs = foldl (const . succ) zero xs
+
 mkBuilding :: Integral n => Point n -> Point n -> String -> Pixels n Char
 mkBuilding p0 p1 name =
     building buildingWallsColor buildingBodyColor p0 p1 (MakeColor <$> name)
