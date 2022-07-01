@@ -111,6 +111,34 @@ drawMatrixFrom zero (firstRow:rows) =
 len :: (Foldable f, Enum n) => n -> f a -> n
 len zero xs = foldl (const . succ) zero xs
 
+renderInCenter :: forall n c. Integral n => Pixels n c -> [[Color c]] -> Pixels n c
+renderInCenter shape [] = shape
+renderInCenter shape rawThing@(firstRow:_) = 
+    Map.union thing shape -- do not swap arguments!
+    where
+        thing = offsetShape offset $ drawMatrixFrom 0 rawThing
+
+        offset = MakePoint
+            { getX = start shapeSizeX thingSizeX
+            , getY = start shapeSizeY thingSizeY
+            }
+
+        start :: forall n. Integral n => n -> n -> n
+        start whole part = (whole - part) `div` 2
+
+        shapeSizeX =
+            let (upper,lower) = boundsBy getX shapePoints
+            in abs $ upper - lower
+        shapeSizeY =
+            let (upper,lower) = boundsBy getY shapePoints
+            in abs $ upper - lower
+        shapePoints = Map.keys shape
+        boundsBy f xs =
+            (f $ maximumBy (compare `on` f) xs
+            ,f $ minimumBy (compare `on` f) xs)
+        thingSizeX = len 0 firstRow 
+        thingSizeY = len 0 rawThing 
+
 mkBuilding :: Integral n => Point n -> Point n -> String -> Pixels n Char
 mkBuilding p0 p1 name =
     building buildingWallsColor buildingBodyColor p0 p1 (MakeColor <$> name)
