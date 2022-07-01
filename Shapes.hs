@@ -7,12 +7,16 @@ module Shapes
 ) where
 import Data.Map qualified as Map
 import Painter
-    ( Point (MakePoint)
+    ( Point (MakePoint, getX, getY)
     , Color (MakeColor)
     , Pixels
     )
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Foldable (fold, toList, maximumBy, minimumBy)
+import Control.Monad (join)
+import Control.Arrow (first)
+import Data.Function (on)
 ----------------- GENERALIZED VECTOR SHAPES (deprecated) -----------------------
 
 -- shapes:
