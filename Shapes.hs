@@ -88,7 +88,7 @@ repaintWithString textToPaintWith =
     -- GUARD otherwise = [MakePixel pt (MakeColor symbol) | ((MakePixel pt _), symbol) <- zip points textToPaintWith]
 
 --RENDER NAME IN THE CENTER NOT IN THE CORNER
-building :: Point -> Point -> String -> [Pixel] -- map composed func to every (x, y)
+building :: Point n -> Point n -> String -> Pixels n c -- map composed func to every (x, y)
 building (MakePoint x1 y1) (MakePoint x2 y2) name = 
     map (paintWall . point) (concat [
         [(x, min y1 y2) | x <- xs], -- upper wall --Запятые забыл добавить. Тоже пососал знатно
