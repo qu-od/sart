@@ -39,11 +39,11 @@ ordRange x1 x2
 
 ------------------------------ SIMPLE (VERT-HORZ) SHAPES -----------------------
 -- road :: Pixel -> Pixel -> [Pixel]
-line :: (Int, Int) -> (Int, Int) -> [Point]
+line :: (Ord n, Enum n) => (n, n) -> (n, n) -> Set (Point n)
 -- types for other args arrangement
 line (x1, y1) (x2, y2)
-    | x1 == x2 = [MakePoint x1 y | y <- [min y1 y2 .. max y1 y2]] --vertical road
-    | y1 == y2 = [MakePoint x y1 | x <- [min x1 x2 .. max x1 x2]] --horizontal road
+    | x1 == x2 = Set.mapMonotonic (MakePoint x1) $ ordRangeSet y1 y2 --vertical road
+    | y1 == y2 = Set.mapMonotonic (`MakePoint` y1) $ ordRangeSet x1 x2 --horizontal road
     | otherwise = error "this road can be either \
         \ vertical or horizontal and not a diagonal"
 -- road (x1, y1) len "left"  = 
