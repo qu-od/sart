@@ -56,9 +56,9 @@ setFromDistinctMonotonicList xs = Set.fromList xs
 
 ------------------------------ SIMPLE (VERT-HORZ) SHAPES -----------------------
 -- road :: Pixel -> Pixel -> [Pixel]
-line :: (Ord n, Enum n) => (n, n) -> (n, n) -> Set (Point n)
+line :: (Ord n, Enum n) => Point n -> Point n -> Set (Point n)
 -- types for other args arrangement
-line (x1, y1) (x2, y2)
+line (MakePoint x1 y1) (MakePoint x2 y2)
     | x1 == x2 = Set.mapMonotonic (MakePoint x1) $ ordRangeSet y1 y2 --vertical road
     | y1 == y2 = Set.mapMonotonic (`MakePoint` y1) $ ordRangeSet x1 x2 --horizontal road
     | otherwise = error "this road can be either \
@@ -171,29 +171,10 @@ middle :: [a] -> Int
 middle xs = (length xs) `div` 2
 
 --RENDER NAME IN THE CENTER NOT IN THE BEGINNING
-street :: forall n. (Ord n, Enum n) => Point n -> Point n -> String -> Pixels n Char
-street (MakePoint x1 y1) (MakePoint x2 y2) rawName = renderResult
+street :: forall n. Integral n => Point n -> Point n -> String -> Pixels n Char
+street p0 p1 rawName =
+    renderInCenter rawStreet [name]
     where
-        rawStreet = line (x1,y1) (x2,y2)
-        name = " " ++ rawName ++ " st." ++ " "
-        offset = (length rawStreet - length name) `div` 2
-
-        repaintStartIndex = offset
-        repaintStopIndex = offset + length name
-
-        pixels = Map.fromSet (const streetColor) rawStreet
-
-        renderResult :: Pixels n Char    
-        renderResult
-            | length pixels > length name =
-                let (prefix,(target,postfix)) =
-                        splitAt repaintStopIndex
-                        <$> splitAt repaintStartIndex (Map.assocs pixels)
-                in fold 
-                    [ Map.fromDistinctAscList prefix
-                    , repaintWithString name $ Map.fromDistinctAscList target
-                    , Map.fromDistinctAscList postfix
-                    ]
-            | otherwise = pixels
-    
+        rawStreet = Map.fromSet (const streetColor) $ line p0 p1
+        name = MakeColor <$> (" " ++ rawName ++ " st." ++ " ")
 
