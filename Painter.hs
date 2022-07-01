@@ -5,6 +5,7 @@
 module Painter
 ( Point (MakePoint)
 , Color (MakeColor)
+, Pixels
 , frame01
 , monochromeScreen
 , monochromeFrame
