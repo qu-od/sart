@@ -1,31 +1,37 @@
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ViewPatterns, ScopedTypeVariables #-}
 module Painter
 ( Point (MakePoint)
 , Color (MakeColor)
-, Pixel (MakePixel)
 , frame01
-, paint
 ) where
 import Data.List (elemIndex, groupBy)
 import GHC.Stack (HasCallStack)
 import Data.Maybe (fromMaybe)
 import Data.Function (on)
-
-
+import Data.Foldable (traverse_, Foldable (toList))
+import qualified Data.Set as Set
+import Data.Set (Set)
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Control.Monad (join, forM, when)
+import Control.Arrow (first, Arrow ((&&&)))
+import qualified GHC.Arr as STArr
+import qualified Control.Monad.ST as ST
+import Control.Monad.Fix
+import Data.Monoid (First(First,getFirst))
 --------------------------------- TYPES ----------------------------------------
 data Point = MakePoint {getX :: Int, getY :: Int} deriving (Show, Eq, Ord)
 
-data Color = MakeColor {symbol :: Char} deriving (Show)
+data Color = MakeColor {symbol :: Char} deriving (Show,Eq)
 
-data Pixel = MakePixel {coords :: Point, color :: Color} deriving (Show)
-
+type Pixels = Map Point Color
 
 --------------------------------- CONSTS ---------------------------------------
 screenWidth :: Int
-screenWidth = 180
+screenWidth = 100
 
 screenHeight :: Int
-screenHeight = 20
+screenHeight = 11
 
 backgroundColor :: Color
 backgroundColor = MakeColor '.'
@@ -39,11 +45,11 @@ defaultColor = MakeColor '@'
 screenSize :: (Int, Int)
 screenSize = (screenWidth, screenHeight)
 
-screenXs :: [Int]
-screenXs = [0 .. screenWidth - 1]
+screenXs :: Set Int
+screenXs = Set.fromList [0 .. screenWidth - 1]
 
-screenYs :: [Int]
-screenYs = [0 .. screenHeight - 1]
+screenYs :: Set Int
+screenYs = Set.fromList [0 .. screenHeight - 1]
 
 
 --------------------------------- WHEELS ---------------------------------------
@@ -53,138 +59,149 @@ scnd (_, y, _) = y
 thrd :: (a, b, c) -> c
 thrd (_, _, z) = z
 
-paint :: Functor f => Char -> f Point -> f Pixel
-paint = fmap . flip MakePixel .  MakeColor
-
-colorInThePoint :: HasCallStack => Point -> [Pixel] -> Color
-colorInThePoint point pixels = color $ pixels !! i
+colorInThePoint :: HasCallStack => Point -> Pixels -> Color
+colorInThePoint = (unwrap .) . Map.lookup
     where
-    i = fromMaybe (error "Elem doesn't exist") $
-            elemIndex point (map coords pixels)
-
+    unwrap = fromMaybe (error "Elem doesn't exist")
 
 ---------------------------- MONOCHROME SCREEN ---------------------------------
 -- func monochromeScreen paints points turning them into pixels.
     -- Since it's monochrome, there is only one color to paint with
-monochromeScreen :: [Point] -> [Pixel]
-monochromeScreen pixelsToPaint = 
-  [MakePixel p $ chooseMonochromeSymbol p
-  | y <- screenYs
-  , x <- screenXs
-  , let p = MakePoint x y]
+monochromeScreen :: Set Point -> Pixels
+monochromeScreen pixelsToPaint =
+    Map.fromSet chooseMonochromeSymbol screenPoints
     where 
         chooseMonochromeSymbol coordPair
             | coordPair `elem` pixelsToPaint = defaultColor
             | otherwise = defaultBackgroundColor
 
-monochromeFrame :: [Point] -> [String]
-monochromeFrame pixelsToPaint = line <$> [0..screenHeight-1]
+monochromeFrame :: Set Point -> [String]
+monochromeFrame pixelsToPaint = line <$> toList screenYs 
     where 
         line y =
-            [symbol
-            | pixel@(MakePixel p (MakeColor symbol))
-                <- monochromeScreen pixelsToPaint
-            , getX p == y
-            ]
-
+            toList
+            . Map.map symbol
+            . Map.filterWithKey (const . (== y) . getY)
+            $ monochromeScreen pixelsToPaint
 
 ----------------------- MULTICOLOR IMPLEMENTATION ------------------------------
-line' :: Int -> [Pixel] -> [Pixel]
-line' y rawColoredPixels = [
-    if pixelWasColored x then coloredPixel x else backgroundPixel x | x <- screenXs --ВЗЯЛ ЛИСТ В ЛИСТ И СОСАЛ ПОЛЧАСА
-    ]
+line' :: Int -> Pixels -> Pixels
+line' y rawColoredPixels =
+    Map.fromSet fill $ Set.map (`MakePoint` y) screenXs --ВЗЯЛ ЛИСТ В ЛИСТ И СОСАЛ ПОЛЧАСА
     where
-        pt x = MakePoint x y
+        fill :: Point -> Color
+        fill x
+            | isColored x = colored x
+            | otherwise = background x
+
+        rawColoredPixelsInLine :: Int -> Pixels
         rawColoredPixelsInLine y = --filtering by pixel.y
-            [px | px <- rawColoredPixels, getY (coords px) == y]
-        pixelWasColored x = 
-            (pt x) `elem` (map coords (rawColoredPixelsInLine y))
-        coloredPixel x = 
-            MakePixel (pt x) (colorInThePoint (pt x) (rawColoredPixelsInLine y))
-        backgroundPixel x = 
-            MakePixel (pt x) backgroundColor
+            Map.filterWithKey (const . (==) y . getY) rawColoredPixels
         
-formPixelMatrix :: [Pixel] -> [[Pixel]]
-formPixelMatrix rawColoredPixels = [line' y rawColoredPixels | y <- screenYs]
-        -- first pixel that matches (x0, y0) coords is chosen.
-        -- So pixel in (x0, y0) will be painted in correspondent color
+        isColored = (`Map.member` rawColoredPixelsInLine y)
+        colored p = colorInThePoint p (rawColoredPixelsInLine y)
+        background _ = backgroundColor
 
-formStrings :: [[Pixel]] -> [String]
+type Matrix n a = Map n (Map n a)
+
+formPixelMatrix :: Pixels -> Matrix Int Color
+formPixelMatrix rawColoredPixels = frameMatrix $
+    foldMap (`line'` rawColoredPixels) screenYs
+
+formStrings :: Matrix Int Color -> [String]
 formStrings pixelMatrix = 
-    [map (symbol . color) pixelLine | pixelLine <- pixelMatrix] -- ДЫААААААА
+    toList $ toList . fmap symbol <$> pixelMatrix -- ДЫААААААА
 
--- DEPRECATED
-frame :: [[Pixel]] -> String
-frame figures = unlines $ formStrings $ formPixelMatrix $ concat figures
+{- | Turns nested maps into a flat map.
+ It assumes to be O(n) since preserves order.
+ Note: 'mergeKeys' MUST hold following rule:
+ @(∀R ∈ {>,<,=,/=})((x,y) R (x1,y1) <=> mergeKeys x y R mergeKeys x1 y1)@
+ -}
+flattenMonotonic ::
+    forall k0 k1 k a.
+    Ord k =>
+    (k0 -> k1 -> k) ->
+    Map k0 (Map k1 a) ->
+    Map k a
+flattenMonotonic mergeKeys =
+    Map.fromAscList -- Use 'Map.fromList' if 'mergeKeys' is not monotonic
+    . mergeMaps
+    . Map.assocs
+    . fmap Map.assocs
+    where 
+        mergeMaps :: [(k0,[(k1,a)])] -> [(k,a)]
+        mergeMaps = (uncurry fmap . first (first . mergeKeys) =<<)
 
+{- | Turns flat maps into a nested maps.
+ It assumes to be O(n) since preserves order.
+ Note: 'splitKeys' MUST hold following rule:
+ @(∀R ∈ {>,<,=,/=})(x R y <=> splitKeys x R splitKeys y)@
+ -}
+unFlattenMonotonic :: forall k0 k1 k a.
+    (Ord k0, Ord k1) =>
+    (k -> (k0,k1)) ->
+    Map k a ->
+    Map k0 (Map k1 a) 
+unFlattenMonotonic splitKeys =
+    fmap Map.fromAscList -- Use 'Map.fromList' if 'splitKeys' is not monotonic
+    . Map.fromAscList -- Use 'Map.fromList' if 'splitKeys' is not monotonic
+    . unmergeMaps
+    . Map.assocs
+    where 
+        unmergeMaps ::  [(k,a)] -> [(k0,[(k1,a)])]
+        unmergeMaps xs =
+            fmap withGroup
+            $ groupBy ((/=) `on` fst)
+            $ pure . unmerge =<< xs
+            
+        withGroup :: [(k0,(k1,a))] -> (k0,[(k1,a)])
+        withGroup xs@((k,_):_) = (k,snd <$> xs)
+
+        unmerge :: (k,a) -> (k0,(k1,a))
+        unmerge (splitKeys -> (k0,k1),v) = (k0,(k1,v))
 
 --------------------- 0.1.0 FRAME IMPLEMENTATION (with HOFs) -------------------
 -- "frame" function alghorithm:
 -- 1. get [figure] (figure = [Pixel]) 
     -- add backgroundPixels as a figure with the lowest precedence for its pixels
--- 2. flatten pixels in those figures, sort them and remove dupes
-    -- (if there is a collision and different figures want to occupy the same point
-    -- figure which was defined earlier in the list of figures wins)
--- 3. form a matrix from that brushed list of pixels
--- 4. form one multiline string for the pixels matrix
+-- 2. form a matrix from that brushed set of pixels
+-- 3. form one multiline string for the pixels matrix
 
-backgroundPixels :: [Pixel]
-backgroundPixels = [
-    MakePixel (MakePoint x y) backgroundColor | x <- screenXs, y <- screenYs
-    ]
+screenPoints :: Set Point
+screenPoints = Set.map (uncurry MakePoint) $
+    Set.cartesianProduct screenXs screenYs
 
-quickSort :: (Ord a, Eq a) => [a] -> [a] 
-quickSort [] = []
-quickSort [x] = [x]
-quickSort (pivot:xs) = 
-    quickSort (filter (<=pivot) xs) ++ [pivot] ++ quickSort (filter (>pivot) xs)
+backgroundPixels :: Pixels
+backgroundPixels = Map.fromSet (const backgroundColor) screenPoints
 
-quickSortWithDupesDeletion :: (Ord a) => [a] -> [a] 
-quickSortWithDupesDeletion [] = []
-quickSortWithDupesDeletion [x] = [x]
-quickSortWithDupesDeletion (pivot:xs) = lessers ++ [pivot] ++ greaters
-    where
-        lessers  = quickSortWithDupesDeletion (filter (<pivot) xs)
-        greaters = quickSortWithDupesDeletion (filter (>pivot) xs)
+isInBound :: Point -> Bool
+isInBound pos = getX pos < screenWidth && getY pos < screenHeight
 
--- arrangePixels is a pixel quicksort by a coords tuple with dupes removal
-arrangePixels :: [Pixel] -> [Pixel]
-arrangePixels [] = []
-arrangePixels [px] = [px]
-arrangePixels (pivotPx:pxs) = lesserPixels ++ [pivotPx] ++ greaterPixels
-    where
-        yx (MakePixel (MakePoint x y) _)  = (y, x) --cuz we need to reverse coordss
-        lesserPixels =
-            arrangePixels $ filter (\px -> yx px < yx pivotPx) pxs
-        greaterPixels =
-            arrangePixels $ filter (\px -> yx px > yx pivotPx) pxs
+dropOutOfBoundsPixels :: Pixels -> Pixels
+dropOutOfBoundsPixels = Map.filterWithKey (const . isInBound)
 
-dropOutOfBoundsPixels :: [Pixel] -> [Pixel]
-dropOutOfBoundsPixels =
-    filter $ \(coords -> pos) ->
-        getX pos < screenWidth && getY pos < screenHeight
+frameMatrix :: Pixels -> Matrix Int Color
+frameMatrix = unFlattenMonotonic $ getX &&& getY
 
-frameMatrix :: [Pixel] -> [[Pixel]]
-frameMatrix = groupBy ((/=) `on` getY . coords)
+unMatrix :: Matrix Int Color -> Pixels
+unMatrix = flattenMonotonic MakePoint
 
-pixelsLineToString :: [Pixel] -> String
-pixelsLineToString = foldMap (pure . symbol . color)
+lineToString :: [Color] -> String
+lineToString = foldMap (pure . symbol)
 
-matrixToString :: [[Pixel]] -> String
-matrixToString = unlines . fmap pixelsLineToString
+matrixToString :: Matrix Int Color -> String
+matrixToString = unlines . toList . fmap (lineToString . toList)
 
-frame01 :: [[Pixel]] -> String
+frame01 :: Matrix Int Color -> String
 frame01 figures = 
     matrixToString 
-    . frameMatrix 
-    . arrangePixels 
+    . frameMatrix
     . dropOutOfBoundsPixels 
-    . concat 
-    $ figures ++ [backgroundPixels]
+    $ Map.union (unMatrix figures) backgroundPixels
 
 
-myPixels :: [Pixel]
-myPixels =
+myPixels :: Pixels
+myPixels = Map.fromList
     [ pix 0 0 '#'
     , pix 0 1 'k'
     , pix 0 2 's'
@@ -192,11 +209,12 @@ myPixels =
     , pix 1 2 'Q'
     ]
     where
-        pix x y sym = MakePixel (MakePoint x y) (MakeColor sym)
+        pix :: Int -> Int -> Char -> (Point,Color)
+        pix x y sym = (MakePoint x y, MakeColor sym)
 
-prettyPixel :: Pixel -> String
-prettyPixel (MakePixel (MakePoint x y) (MakeColor color)) =
-    concat [show x, ":", show y, " ", [color]]
+-- prettyPixel :: Pixel -> String
+-- prettyPixel (MakePixel (MakePoint x y) (MakeColor color)) =
+--     concat [show x, ":", show y, " ", [color]]
 
-printMatrix :: [Pixel] -> IO ()
-printMatrix = traverse_ (print . fmap prettyPixel) . frameMatrix
+-- printMatrix :: [Pixel] -> IO ()
+-- printMatrix = traverse_ (print . fmap prettyPixel) . frameMatrix
