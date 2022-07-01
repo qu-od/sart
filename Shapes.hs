@@ -76,9 +76,11 @@ buildingWallsColor = MakeColor '#'
 buildingBodyColor :: Color Char
 buildingBodyColor = MakeColor ' '
 
-repaintWithString :: String -> [Pixel] -> [Pixel]
-repaintWithString textToPaintWith points = 
-    [MakePixel pt (MakeColor symbol) | (MakePixel pt _, symbol) <- zip points textToPaintWith]
+repaintWithString :: Eq n => [b] -> Pixels n a -> Pixels n b
+repaintWithString textToPaintWith = 
+    Map.fromAscList
+    . zipWith (\b (pt,_) -> (pt,MakeColor b)) textToPaintWith
+    . Map.toAscList 
     -- GUARD length textToPaintWith /= length points =
        -- error "Len of points doesn't match with len of string to paint with"
     -- GUARD otherwise = [MakePixel pt (MakeColor symbol) | ((MakePixel pt _), symbol) <- zip points textToPaintWith]
