@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 module Routes
 ( Route (MakeRoute)
 , routePoints
