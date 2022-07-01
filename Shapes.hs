@@ -70,10 +70,10 @@ box (x1, y1) (x2, y2) =
 -- box (x1, x2) width height = 
 
 --------------------------------- BUILDINGS ------------------------------------
-buildingWallsColor :: Color
+buildingWallsColor :: Color Char
 buildingWallsColor = MakeColor '#'
 
-buildingBodyColor :: Color
+buildingBodyColor :: Color Char
 buildingBodyColor = MakeColor ' '
 
 repaintWithString :: String -> [Pixel] -> [Pixel]
@@ -114,7 +114,7 @@ building (MakePoint x1 y1) (MakePoint x2 y2) name =
 
 
 ---------------------------------- STREETS -------------------------------------
-streetColor :: Color
+streetColor :: Color Char
 streetColor = MakeColor '+'
 
 middle :: [a] -> Int
