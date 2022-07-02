@@ -146,6 +146,7 @@ renderInCenter shape rawThing@(firstRow : _) =
         let (upper, lower) = boundsBy getY shapePoints
          in abs $ upper - lower
     shapePoints = Map.keys shape
+    
     boundsBy f xs =
         ( f $ maximumBy (compare `on` f) xs
         , f $ minimumBy (compare `on` f) xs
@@ -159,12 +160,11 @@ mkBuilding p0 p1 name =
 
 building :: Integral n => Color c -> Color c -> Point n -> Point n -> [Color c] -> Pixels n c
 building wallColor floorColor p1@(MakePoint x1 y1) p2@(MakePoint x2 y2) name =
-    Map.union walls innerSpace
+    Map.union innerSpace walls
   where
-    walls =
-        flip renderInCenter [name] $
-            Map.fromSet (const wallColor) outerSpacePoints
-    innerSpace = Map.fromSet (const floorColor) innerSpacePoints
+    walls = Map.fromSet (const wallColor) outerSpacePoints
+    innerSpace = flip renderInCenter [name] $
+        Map.fromSet (const floorColor) innerSpacePoints
 
     outerSpacePoints = box p1 p2
     innerSpacePoints =
@@ -177,9 +177,6 @@ building wallColor floorColor p1@(MakePoint x1 y1) p2@(MakePoint x2 y2) name =
 ---------------------------------- STREETS -------------------------------------
 streetColor :: Color Char
 streetColor = MakeColor '+'
-
-middle :: [a] -> Int
-middle xs = (length xs) `div` 2
 
 -- RENDER NAME IN THE CENTER NOT IN THE BEGINNING
 street :: forall n. Integral n => Point n -> Point n -> String -> Pixels n Char
