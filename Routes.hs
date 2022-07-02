@@ -24,7 +24,7 @@ withSetAscDesc :: ([a] -> [b]) -> Set a -> Set b
 withSetAscDesc f = Set.fromDistinctAscList . f . toList
 
 ------------------------------ IN-STREET ROUTES --------------------------------
--- CHECK CASES SYNTAX!
+-- | Interpolate polylines
 routePoints :: (Ord n, Enum n) => Set (Point n) -> Set (Point n)
 routePoints (toList -> xs) =
     case xs of
