@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Weverything #-}
 module Shapes (
     Shape (MakeShape),
     line,
