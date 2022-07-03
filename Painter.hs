@@ -369,3 +369,6 @@ frame01 figures =
 ---------------- 0.1.2 FRAME (Data Modules and verbose types) ------------------
 foo :: String
 foo = "bar" -- new branch test
+-- commit to painter-rewrite branch
+-- another commit
+-- and another one
