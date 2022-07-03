@@ -6,8 +6,9 @@ import Painter
     , Direction (NoDirection, Up, Down, Left', Right')
     , Shape (EmptyShape, Building, StreetPD, StreetPP, Route)
     , Place (Intersection, Deadend, Busstop) -- for advanced routes
+    , stPDP2
     , frame012
-    , paint
+    , paint -- deprecated
     )
 
 import Shapes 
@@ -17,6 +18,8 @@ import Shapes
     , building -- deprecated  
     , street -- deprecated  
     )
+
+--import GHC.Stack (HasCallStack)
 
 
 -------------------------- QUESTIONS -------------------------------------------
@@ -51,8 +54,8 @@ testCharGenColor = MkGenColor '$'
 testGenPixel :: GenPixel Char
 testGenPixel = MkGenPixel testPoint testCharGenColor
 
-anotherTestGenPixel :: GenPixel a
-anotherTestGenPixel = MkGenPixel (MkIntPoint 3 4) MkGenColor '-'  
+--anotherTestGenPixel :: GenPixel a -- What's your problem?
+--anotherTestGenPixel = MkGenPixel (MkIntPoint 3 4) MkGenColor '-'
 
 p :: Int -> Int -> IntPoint
 p = MkIntPoint
@@ -91,28 +94,43 @@ testShapes = [ -- leading elements have higher priority in rendering
     Route 3 (zipWith p [10, 10, 134, 134]  [6, 4, 4, 1])
     ]
 
-takeStreets :: [Shape] -> [Shape]
-takeStreets = undefined
+isStreet :: Shape -> Bool
+isStreet StreetPD {} = True -- record patterns OH MY!
+isStreet StreetPP {} = True
+isStreet _ = False
 
+-- which type?
+streetRequiredError :: a
+streetRequiredError = error "There was a Shape... But there was no STREET!"
+
+-- USE SETS THERE
 intersectionsOfStreets :: [Shape] -> [Place]
 intersectionsOfStreets = undefined
 
-deadendsOfStreets :: [Shape] -> [Place]
-deadendsOfStreets = undefined
+deadendsOfStreet :: Shape -> [Place]
+deadendsOfStreet st@(StreetPD _ pt dir len) = 
+    [Deadend st pt, Deadend st (stPDP2 st)]
+deadendsOfStreet st@(StreetPP _ pt1 pt2) = [Deadend st pt1, Deadend st pt2]
+deadendsOfStreet _ = streetRequiredError
+
+defaultBusstopDistance :: Int
+defaultBusstopDistance = 5
 
 busstopsForStreet :: Shape -> [Place]
-busstopsForStreet = undefined
+busstopsForStreet st@(StreetPD _ pt dir len) = undefined
+busstopsForStreet st@(StreetPP _ pt1 pt2) = undefined
+busstopsForStreet _ = streetRequiredError
 
 testPlaces :: [Place]
 testPlaces = concat [
     intersectionsOfStreets streets,
-    deadendsOfStreets streets, 
-    concatMap busstopsForStreet streets -- OH MY
+    concatMap deadendsOfStreet streets, 
+    concatMap busstopsForStreet streets -- concatMap OH MY!
     ]
     where 
-        streets = takeStreets testShapes
+        streets = filter isStreet testShapes
 
 
 --------------------------------------- MAIN -----------------------------------
 renderFrame :: IO ()
-renderFrame = putStr $ frame012 testShapes testPlaces
+renderFrame = putStr $ frame012 (testShapes, testPlaces)

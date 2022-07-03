@@ -6,6 +6,7 @@ module Painter
 , Direction (NoDirection, Up, Down, Left', Right')
 , Shape (EmptyShape, Building, StreetPD, StreetPP, Route)
 , Place (Intersection, Deadend, Busstop) -- for advanced routes
+, stPDP2
 , frame012
 , paint -- deprecated
 , Point (MakePoint) -- deprecated
@@ -91,7 +92,7 @@ gPx (MkGenPixel pt color) = xy pt ++ show color
 --showMapPx (Map.Map pt genColor) = xy pt ++ show genColor --WHY Map.Map is not in scope?
 
 -------------- Frame
-type Frame a = Map.Map (GenPixel a) Color    
+type Frame a = Map.Map IntPoint (GenColor a)
 -- type synonyms can't be instantiated
 
 data TestFrame a = MkTestFrame (Map.Map (GenPixel a) Color)
@@ -106,6 +107,7 @@ data Direction =
     | Right'
     | Naher
     | AdAstra
+    deriving (Eq)
 
 instance Show Direction where
     show NoDirection = "There is a direction with a nullary constructor, \
@@ -121,7 +123,8 @@ instance Show Direction where
 ---------------- Shape
 data Shape = 
         -- All shapes could've been implemented with maps
-        --(Map Name|Number Points|Whatever)
+        -- (Map Name|Number Points|Whatever)
+        -- record syntax DISCOURAGED when multiple value constructors are used
     EmptyShape 
     | Building {
         name :: String,
@@ -142,7 +145,6 @@ data Shape =
     | Route {
         number :: Int, pts :: [IntPoint]
         }
---how do we merge values of (Map Point Color) then?
 
 instance Show Shape where 
     show EmptyShape = "Empty Shape"
@@ -159,20 +161,32 @@ instance Show Shape where
         "Route #", show num, "Turns: ", show pts
         ]
 
+stPDP2 :: Shape -> IntPoint
+stPDP2 (StreetPD _ (MkIntPoint x y) dir len)
+    | dir == Up     = p x (y-d)
+    | dir == Down   = p x (y+d)
+    | dir == Left'  = p (x-d) y
+    | dir == Right' = p (x+d) y
+    where 
+        p = MkIntPoint
+        d = len - 1
+stPDP2 _ = error "pt2 requires StreetPD and not any other Shape"
+
 -------------- Place
-data Place = 
+data Place =
+    -- record syntax DISCOURAGED when multiple value constructors are used
     Intersection {
         street1 :: Shape,
         street2 :: Shape,
-        iPoint :: IntPoint
+        pPoint :: IntPoint
         } 
     | Deadend { -- every "start" and every "end" of the street 
         street :: Shape,
-        dPoint :: IntPoint
+        pPoint :: IntPoint
         }
     | Busstop { -- on the street
         street :: Shape,
-        bPoint :: IntPoint
+        pPoint :: IntPoint
         }
 
 instance Show Place where
@@ -195,15 +209,6 @@ screenWidth = 180
 screenHeight :: Int
 screenHeight = 20
 
-backgroundColor :: Color
-backgroundColor = MakeColor '.'
-
-defaultBackgroundColor :: Color
-defaultBackgroundColor = MakeColor '-'
-
-defaultColor :: Color
-defaultColor = MakeColor '@'
-
 screenSize :: (Int, Int)
 screenSize = (screenWidth, screenHeight)
 
@@ -212,6 +217,25 @@ screenXs = [0 .. screenWidth - 1]
 
 screenYs :: [Int]
 screenYs = [0 .. screenHeight - 1]
+
+palette :: Map.Map String (GenColor Char)
+palette = Map.fromList [
+    ("background",       c '.'),
+    ("building wall",    c '%'),
+    ("building body",    c ' '),
+    ("street",           c '#'),
+    ("route",            c '^'), -- if it won't be a number-char one time
+    ("intersection",     c '+'),
+    ("deadend",          c '~'),
+    ("busstop",          c '*'),
+    ("route vertical",   c '|'), -- for advanced routes maybe
+    ("route horizontal", c '-')  -- for advanced routes maybe
+    ]
+    where c = MkGenColor
+
+backgroundColor00x :: Color --deprecated
+backgroundColor00x = MakeColor ' '
+
 
 
 --------------------------------- WHEELS ---------------------------------------
@@ -264,8 +288,8 @@ monochromeScreen pixelsToPaint =
         xs = [0 .. screenWidth-1 ]
         ys = [0 .. screenHeight-1]
         chooseMonochromeSymbol coordPair = if coordPair `elem` pixelsToPaint
-            then defaultColor
-            else defaultBackgroundColor
+            then MakeColor ' '
+            else backgroundColor00x
 
 monochromeFrame :: [(Int, Int)] -> [String]
 monochromeFrame pixelsToPaint = [line y | y <- [0..screenHeight-1]]
@@ -290,7 +314,7 @@ line' y rawColoredPixels = [
         coloredPixel x = 
             MakePixel (pt x) (colorInThePoint (pt x) (rawColoredPixelsInLine y))
         backgroundPixel x = 
-            MakePixel (pt x) backgroundColor
+            MakePixel (pt x) backgroundColor00x
         
 formPixelMatrix :: [Pixel] -> [[Pixel]]
 formPixelMatrix rawColoredPixels = [line' y rawColoredPixels | y <- screenYs]
@@ -318,7 +342,7 @@ frame figures = unlines $ formStrings $ formPixelMatrix $ concat figures
 
 backgroundPixels :: [Pixel]
 backgroundPixels = [
-    MakePixel (MakePoint x y) backgroundColor | x <- screenXs, y <- screenYs
+    MakePixel (MakePoint x y) backgroundColor00x | x <- screenXs, y <- screenYs
     ]
 
 quickSort :: (Ord a, Eq a) => [a] -> [a] 
@@ -374,6 +398,22 @@ frame01 figures =
 
 
 ---------------- 0.1.2 FRAME (Data Modules and verbose types) ------------------
+------ frame012 ALGORITHM ------
+-- 1. Get Shapes and Places
+-- 2. Form colored pixels for every Shape and Place
+-- 3. Dump them in a Frame
+    -- Duplicates are removed because 
+        -- Frame Char = Map IntPoint (GenColor Char)
+-- 4. Form multiline string from a Frame
 
-frame012 :: [Shape] -> [Place] -> String
-frame012 = undefined
+dumpPixels :: ([Shape], [Place]) -> [GenPixel Char]
+dumpPixels = undefined
+
+frameMapFromPixels :: [GenPixel Char] -> Frame Char
+frameMapFromPixels = undefined
+
+showFrame :: Frame Char -> String
+showFrame = undefined
+
+frame012 :: ([Shape], [Place]) -> String
+frame012 = showFrame . frameMapFromPixels . dumpPixels
