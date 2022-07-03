@@ -1,9 +1,9 @@
 module Shapes
-( Figure (MakeFigure)
-, line
-, box
-, building
-, street
+( Figure (MakeFigure) -- deprecated  
+, line -- deprecated  
+, box -- deprecated  
+, building -- deprecated  
+, street -- deprecated  
 ) where
 
 import Painter

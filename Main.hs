@@ -1,23 +1,23 @@
 import Painter
-    ( Point (MakePoint)
-    , Color (MakeColor)
-    , Pixel (MakePixel)
-    , frame01
+    ( IntPoint (MkIntPoint)
+    , GenColor (MkGenColor)
+    , GenPixel (MkGenPixel)
+    , Frame
+    , Direction (NoDirection, Up, Down, Left', Right')
+    , Shape (EmptyShape, Building, StreetPD, StreetPP, Route)
+    , Place (Intersection, Deadend, Busstop) -- for advanced routes
+    , frame012
     , paint
     )
 
 import Shapes 
-    ( Figure (MakeFigure)
-    , line        
-    , box
-    , building
-    , street
+    ( Figure (MakeFigure) -- deprecated  
+    , line -- deprecated  
+    , box -- deprecated  
+    , building -- deprecated  
+    , street -- deprecated  
     )
 
-import Routes
-    (-- Route (MakeRoute)
-     route
-    )
 
 -------------------------- QUESTIONS -------------------------------------------
 -- how do you choose between let, where, guards, cases, ifs and matternmatching?
@@ -42,15 +42,23 @@ import Routes
 
 
 ----------------------------- MAIN ---------------------------------------------
---alias
-pt :: Int -> Int -> Point
-pt = MakePoint
+testPoint :: IntPoint
+testPoint = MkIntPoint 2 3
 
-ptt :: (Int, Int) -> Point
-ptt (x, y) = MakePoint x y
+testCharGenColor :: GenColor Char
+testCharGenColor = MkGenColor '$'
 
-testPoints :: [Point]
-testPoints = map ptt [
+testGenPixel :: GenPixel Char
+testGenPixel = MkGenPixel testPoint testCharGenColor
+
+anotherTestGenPixel :: GenPixel a
+anotherTestGenPixel = MkGenPixel (MkIntPoint 3 4) MkGenColor '-'  
+
+p :: Int -> Int -> IntPoint
+p = MkIntPoint
+
+testPoints :: [IntPoint]
+testPoints = map (uncurry p) [
     (136, 2),
     (149, 2),
     (149, 6),
@@ -60,38 +68,51 @@ testPoints = map ptt [
     (134, 1) -- i=6
     ]
 
-testFigures :: [Figure]
-testFigures = [ -- leading elements have higher priority in rendering
--- все названия мелкий придумывал, так что не надо тут
-    building (pt 20 0) (pt 42 4) "TEST BUILDING 1",
-    building (pt 50 1) (pt 56 4) "5букв",
-    building (pt 40 4) (pt 60 6) "TEST BUILdinG 68",
-    building (pt 44 14) (pt 70 19) " в ебенях",
-    building (pt 74 4) (pt 80 6) "что-то",
+testShapes :: [Shape]
+testShapes = [ -- leading elements have higher priority in rendering
+    Building "TEST BUILDING 1"  (p 20 0)  (p 42 4),
+    Building "5букв"            (p 50 1)  (p 56 4),
+    Building "TEST BUILdinG 68" (p 40 4)  (p 60 6),
+    Building " в ебенях"        (p 44 14) (p 70 19),
+    Building "что-то"           (p 74 4)  (p 80 6),
     -- 
-    street (pt 150 3) (pt 120 3) "Gayorgyeva",
-    street (pt 100 5) (pt 150 5) "Svobody",
-    street (pt 120 0) (pt 120 5) "Vo",
-    street (pt 150 2) (pt 399 2) "TUPIKOVYI TYPIK",
-    street (pt 171 2) (pt 228 2) "Бельфегоровская",
+    StreetPD "Vo"               (p 150 5) Left'  50,
+    StreetPD "TUPIKOVYI TYPIK"  (p 150 3) Right' 20,
+    StreetPD "Бельфегоровская"  (p 50 5)  Up     5,
     --
-    route '1' (zipWith pt [40, 44, 44] [4, 4, 14]),
-    route '2' (zipWith pt [136, 149, 149, 10] [2, 2, 6, 6]),
-    route '3' (zipWith pt [10, 10, 134, 134] [6, 4, 4, 1]),
+    StreetPP "Gayorgyeva"       (p 150 3) (p 120 3),
+    StreetPP "Svobody"          (p 100 5) (p 150 5),
+    StreetPP "Vo"               (p 120 0) (p 120 5),
+    StreetPP "TUPIKOVYI TYPIK"  (p 150 2) (p 399 2),
+    StreetPP "Бельфегоровская"  (p 171 2) (p 228 2),
     --
-    MakeFigure $ paint '7' $ box (2, 2) (10, 5),
-    MakeFigure $ paint 'g' $ line (40, 4) (45, 4),
-    MakeFigure $ paint 'o' $ line (5, 0) (30, 0)
+    Route 1 (zipWith p [40, 44, 44]        [4, 4, 14]),
+    Route 2 (zipWith p [136, 149, 149, 10] [2, 2, 6, 6]),
+    Route 3 (zipWith p [10, 10, 134, 134]  [6, 4, 4, 1])
     ]
 
-pixels :: Figure -> [Pixel]
-pixels (MakeFigure []) = [] 
-pixels (MakeFigure [px]) = [px]
-pixels (MakeFigure (px0:pxs)) = px0:pxs
+takeStreets :: [Shape] -> [Shape]
+takeStreets = undefined
 
-figuresToPixels :: [Figure] -> [Pixel]
-figuresToPixels = foldr (\fig acc -> pixels fig ++ acc) []
+intersectionsOfStreets :: [Shape] -> [Place]
+intersectionsOfStreets = undefined
+
+deadendsOfStreets :: [Shape] -> [Place]
+deadendsOfStreets = undefined
+
+busstopsForStreet :: Shape -> [Place]
+busstopsForStreet = undefined
+
+testPlaces :: [Place]
+testPlaces = concat [
+    intersectionsOfStreets streets,
+    deadendsOfStreets streets, 
+    concatMap busstopsForStreet streets -- OH MY
+    ]
+    where 
+        streets = takeStreets testShapes
+
 
 --------------------------------------- MAIN -----------------------------------
 renderFrame :: IO ()
-renderFrame = putStr $ frame01 $ figuresToPixels testFigures
+renderFrame = putStr $ frame012 testShapes testPlaces

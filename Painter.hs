@@ -1,9 +1,16 @@
 module Painter
-( Point (MakePoint)
-, Color (MakeColor)
-, Pixel (MakePixel)
-, frame01
-, paint
+( IntPoint (MkIntPoint)
+, GenColor (MkGenColor)
+, GenPixel (MkGenPixel)
+, Frame
+, Direction (NoDirection, Up, Down, Left', Right')
+, Shape (EmptyShape, Building, StreetPD, StreetPP, Route)
+, Place (Intersection, Deadend, Busstop) -- for advanced routes
+, frame012
+, paint -- deprecated
+, Point (MakePoint) -- deprecated
+, Color (MakeColor) -- deprecated
+, Pixel (MakePixel) -- deprecated
 ) where
 
 import Data.List ( 
@@ -84,7 +91,7 @@ gPx (MkGenPixel pt color) = xy pt ++ show color
 --showMapPx (Map.Map pt genColor) = xy pt ++ show genColor --WHY Map.Map is not in scope?
 
 -------------- Frame
-type Frame a = Map.Map (GenPixel a) Color     
+type Frame a = Map.Map (GenPixel a) Color    
 -- type synonyms can't be instantiated
 
 data TestFrame a = MkTestFrame (Map.Map (GenPixel a) Color)
@@ -367,9 +374,6 @@ frame01 figures =
 
 
 ---------------- 0.1.2 FRAME (Data Modules and verbose types) ------------------
-foo :: String
-foo = "bar" -- new branch test
--- commit to painter-rewrite branch
--- another commit
--- and another one
--- refactor-3 branch first commit
+
+frame012 :: [Shape] -> [Place] -> String
+frame012 = undefined
