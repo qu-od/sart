@@ -1,3 +1,6 @@
+import Data.Function ( on )
+
+
 --------------------- BASICS TESTING ----------------------------
 a = [1, 2, 3]
 b = [4, 5, 6]
@@ -133,3 +136,36 @@ quickSort'' (pivot:xs) = sortedLessers ++ [pivot] ++ sortedGreaters
     where
         sortedLessers  = quickSort' $ filter (<= pivot) xs
         sortedGreaters = quickSort' $ filter (>  pivot) xs
+
+
+--------------------------------------------------------------------------------
+------------------------------ TYPECLASSES TEST --------------------------------
+--------------------------------------------------------------------------------
+data FloatPoint = MakeFloatPoint {xx :: Float, yy :: Float} deriving (Eq)
+--superclasses will be instanctated manually
+
+data GenericPoint a = MakeGenericPoint {gx :: a, gy :: a} deriving (Show)
+--instantiate type of a kind * -> * manually later 
+
+class PointEqFoo concrType where --gimmick typeclass. OH MY!
+    (==%^#==) :: concrType -> concrType -> Bool
+    (/==%^#==) :: concrType -> concrType -> Bool
+    x ==%^#== y = not (x /==%^#== y) -- how TF mutual recursion works?
+    x /==%^#== y = not (x ==%^#== y)
+
+instance PointEqFoo FloatPoint where -- OH MY
+    flPt1 ==%^#== flPt2  =
+        ((==) `on` xx) flPt1 flPt2 && ((==) `on` yy) flPt1 flPt2
+    flPt1 /==%^#== flPt2 =
+        ((/=) `on` xx) flPt1 flPt2 || ((/=) `on` yy) flPt1 flPt2
+
+instance Show FloatPoint where -- OH MY (x2)
+    show fPt = "custom Show instantiation with a FloatPoint.\n\
+                \x = " ++ show (xx fPt) ++ "y = " ++ show (yy fPt)
+
+instance Ord FloatPoint where -- Ord is a subclass of Eq!
+    -- say we want to ord those points by Radius-vector
+    compare = compare `on` r
+        where 
+            r fPt = sqrt $ xx fPt ^ 2 + yy fPt ^ 2
+

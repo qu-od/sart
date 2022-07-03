@@ -5,15 +5,180 @@ module Painter
 , frame01
 , paint
 ) where
-import Data.List (nub)
 
+import Data.List ( 
+    nub, sort, reverse
+    )
+import Data.Char (
+    isUpper, isDigit, isLower
+    )
+import qualified Data.Map as Map
+import qualified Data.Set as Set
+import Data.Function ( on )
 
---------------------------------- TYPES ----------------------------------------
+--------------- OLD TYPES (deprecated since 0.0.1) -----------------------------
 data Point = MakePoint {getX :: Int, getY :: Int} deriving (Show, Eq, Ord)
+--howw auto-deriving works. Which order will points even have?
 
 data Color = MakeColor {symbol :: Char} deriving (Show)
 
 data Pixel = MakePixel {coords :: Point, color :: Color} deriving (Show)
+
+
+----------------------------- IntPoint type 0.1.1 ------------------------------
+-- type needs testing
+data IntPoint = MkIntPoint {iX :: Int, iY :: Int}
+
+instance Eq IntPoint where 
+    MkIntPoint x1 y1 == MkIntPoint x2 y2 = (x1 == x2) && (y1 == y2)
+    MkIntPoint x1 y1 /= MkIntPoint x2 y2 = (x1 /= x2) || (y1 /= y2)
+    
+instance Ord IntPoint where
+    compare (MkIntPoint x1 y1) (MkIntPoint x2 y2)
+        | y1 /= y2 = compare y1 y2
+        | otherwise = compare x1 x2
+
+--instance Bounded IntPoint where
+    --minBound = (head screenXs, head screenYs)
+    --maxBound = (last screenXs, last screenYs)
+
+--instance Enum IntPoint where
+    -- all possible values are: 
+    -- [MakeIP x y | y <- screenYs, x <- screenXs]
+    -- and that's an order! (pun intended)
+
+instance Show IntPoint where
+    show (MkIntPoint x y) = "IntPoint: x=" ++ show x ++ ", y=" ++ show y
+
+--instance Read IntPoint where
+    -- PARSER MODULE NEEDED
+
+-- shorter string for a IntPoint
+xy :: IntPoint -> String
+xy (MkIntPoint x y) = "X=" ++ show x ++ ", Y=" ++ show y
+
+--------------------- OTHER TYPES 0.1.1 (Maps and Sets) ------------------------
+--------------- GenColor
+data GenColor a = MkGenColor a deriving (Show)
+-- how that show will be implemented on different types?
+-- which types could be a? Other than Char
+
+--------------- GenPixel
+data GenPixel a = MkGenPixel {
+    point :: IntPoint,
+    genColor :: GenColor a
+    } 
+
+instance (Show a) => Show (GenPixel a) where
+-- constraint shows that type "a" will be put into string somewhere in this function
+    show (MkGenPixel pt genColor) = 
+        "GenPixel at " ++ xy pt ++ "With GenColor " ++ show genColor
+
+-- shorter string for a GenPixel
+gPx :: (Show a) => GenPixel a -> String
+gPx (MkGenPixel pt color) = xy pt ++ show color
+
+-- type MapPixel a = Map.Map IntPoint (GenColor a) -- record syntax is illegal here!
+-- instance (Show a) => Show (MapPixel a) where -- CANNOT INSTANTIATE TYPE SYNONYMS WTF
+     --show pts clrs = show "MapPixel coords"
+--showMapPx (Map.Map pt genColor) = xy pt ++ show genColor --WHY Map.Map is not in scope?
+
+-------------- Frame
+type Frame a = Map.Map (GenPixel a) Color     
+-- type synonyms can't be instantiated
+
+data TestFrame a = MkTestFrame (Map.Map (GenPixel a) Color)
+--Map.Map is a TYPE CONSTRUCTOR, not a VALUE CONSTRUCTOR! 
+
+-------------- Direction
+data Direction = 
+    NoDirection
+    | Up
+    | Down
+    | Left'
+    | Right'
+    | Naher
+    | AdAstra
+
+instance Show Direction where
+    show NoDirection = "There is a direction with a nullary constructor, \
+                        \but it says \"NoDirection\" lol"
+    show Up = "Upwards"
+    show Down = "Downwards"
+    show Left' = "to the Left"
+    show Right' = "to the Right"
+    show Naher = "No luck to you pal. You better stop doing this"
+    show AdAstra = "That's some strange nullary value constructor \
+                    \of the Direction type you've got there..."
+
+---------------- Shape
+data Shape = 
+        -- All shapes could've been implemented with maps
+        --(Map Name|Number Points|Whatever)
+    EmptyShape 
+    | Building {
+        name :: String,
+        pt1 :: IntPoint,
+        pt2 :: IntPoint
+        }
+    | StreetPD {
+        name :: String,
+        pt :: IntPoint,
+        dir :: Direction,
+        len :: Int
+        }
+    | StreetPP {
+        name :: String,
+        pt1 :: IntPoint,
+        pt2 :: IntPoint
+        }
+    | Route {
+        number :: Int, pts :: [IntPoint]
+        }
+--how do we merge values of (Map Point Color) then?
+
+instance Show Shape where 
+    show EmptyShape = "Empty Shape"
+    show (Building name pt1 pt2) = concat [
+        "Building \"", name, "\" between ", xy pt1, "; ", xy pt2
+        ]
+    show (StreetPD name pt dir len) = concat [
+        name, "Street from ", xy pt, show dir, "len=", show len
+        ]
+    show (StreetPP name pt1 pt2) = concat [
+        name, "Street from ", xy pt1, "to ", xy pt2
+        ]
+    show (Route num pts) = concat [
+        "Route #", show num, "Turns: ", show pts
+        ]
+
+-------------- Place
+data Place = 
+    Intersection {
+        street1 :: Shape,
+        street2 :: Shape,
+        iPoint :: IntPoint
+        } 
+    | Deadend { -- every "start" and every "end" of the street 
+        street :: Shape,
+        dPoint :: IntPoint
+        }
+    | Busstop { -- on the street
+        street :: Shape,
+        bPoint :: IntPoint
+        }
+
+instance Show Place where
+    show (Intersection st1 st2 pt) = concat [
+        "Place \"Intersection\" of ",
+        name st1, "st. and ",
+        name st2, "st. at",
+        xy pt
+        ]
+    show (Deadend st pt) =
+        "Place \"Deadend\" of " ++ name st ++ "st. at " ++ xy pt
+    show (Busstop st pt) = 
+        "Place \"Busstop\" on a " ++ name st ++ "st. at " ++ xy pt
 
 
 --------------------------------- CONSTS ---------------------------------------
@@ -114,7 +279,7 @@ line' y rawColoredPixels = [
         rawColoredPixelsInLine y = --filtering by pixel.y
             [px | px <- rawColoredPixels, getY (coords px) == y]
         pixelWasColored x = 
-            (pt x) `elem` (map coords (rawColoredPixelsInLine y))
+            pt x `elem` map coords (rawColoredPixelsInLine y)
         coloredPixel x = 
             MakePixel (pt x) (colorInThePoint (pt x) (rawColoredPixelsInLine y))
         backgroundPixel x = 
@@ -195,8 +360,10 @@ pixelsLineToString = foldr (\px acc -> symbol (color px):acc) ""
 matrixToString :: [[Pixel]] -> String
 matrixToString pxsMatrix = unlines $ map pixelsLineToString pxsMatrix
 
-frame01 :: [[Pixel]] -> String
+-- takes a list of (completely) unsorted pixels
+frame01 :: [Pixel] -> String
 frame01 figures = 
-    matrixToString . frameMatrix . arrangePixels . dropOutOfBoundsPixels . concat $ figures ++ [backgroundPixels]
+    (matrixToString . frameMatrix . arrangePixels . dropOutOfBoundsPixels) (figures ++ backgroundPixels)
 
 
+--------------------- 0.1.1 FRAME (Data Modules and types) ---------------------

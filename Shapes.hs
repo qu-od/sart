@@ -1,5 +1,5 @@
 module Shapes
-( Shape (MakeShape)
+( Figure (MakeFigure)
 , line
 , box
 , building
@@ -11,6 +11,7 @@ import Painter
     , Color (MakeColor)
     , Pixel (MakePixel)
     )
+
 ----------------- GENERALIZED VECTOR SHAPES (deprecated) -----------------------
 
 -- shapes:
@@ -27,7 +28,7 @@ import Painter
 
 
 -------------------------------------- TYPES -----------------------------------
-data Shape = MakeShape [Point] deriving (Show)
+data Figure = MakeFigure {pixels :: [Pixel]} deriving (Show)
 
 
 ------------------------------------WHEEL FUNCS --------------------------------
@@ -72,9 +73,9 @@ repaintWithString textToPaintWith points =
     -- GUARD otherwise = [MakePixel pt (MakeColor symbol) | ((MakePixel pt _), symbol) <- zip points textToPaintWith]
 
 --RENDER NAME IN THE CENTER NOT IN THE CORNER
-building :: Point -> Point -> String -> [Pixel] -- map composed func to every (x, y)
+building :: Point -> Point -> String -> Figure -- map composed func to every (x, y)
 building (MakePoint x1 y1) (MakePoint x2 y2) name = 
-    map (paintWall . point) (concat [
+    MakeFigure $ map (paintWall . point) (concat [
         [(x, min y1 y2) | x <- xs], -- upper wall --Запятые забыл добавить. Тоже пососал знатно
         [(x, max y1 y2) | x <- xs], -- lower wall
         [(min x1 x2, y) | y <- choppedYs], -- left wall
@@ -94,10 +95,9 @@ building (MakePoint x1 y1) (MakePoint x2 y2) name =
         --repaintStartIndexInMatrix = 
         paintWall wallPoint = MakePixel wallPoint buildingWallsColor
         paintBody bodyPoint = MakePixel bodyPoint buildingBodyColor
-        nameIsRendered = if (len ys >= 3) && (len xs >= (len name) + 2)
-            then True else False
+        nameIsRendered = (len ys >= 3) && (len xs >= len name + 2)
         addNameToBody pixels = if nameIsRendered
-            then (repaintWithString name (take (len name) pixels)) ++ drop (len name) pixels 
+            then repaintWithString name (take (len name) pixels) ++ drop (len name) pixels 
             else pixels
 
 
@@ -106,24 +106,25 @@ streetColor :: Color
 streetColor = MakeColor '+'
 
 middle :: [a] -> Int
-middle xs = (length xs) `div` 2
+middle xs = length xs `div` 2
 
 --RENDER NAME IN THE CENTER NOT IN THE BEGINNING
-street :: Point -> Point -> String -> [Pixel]
+street :: Point -> Point -> String -> Figure
 street (MakePoint x1 y1) (MakePoint x2 y2) rawName
-    | x1 == x2 = tryToRenderName [MakePixel (MakePoint x1 y) streetColor | y <- ordRange y1 y2] -- vertical road
-    | y1 == y2 = tryToRenderName [MakePixel (MakePoint x y1) streetColor | x <- ordRange x1 x2] -- horizontal road
+    | x1 == x2 = fuck [MakePixel (MakePoint x1 y) streetColor | y <- ordRange y1 y2] -- vertical road
+    | y1 == y2 = fuck [MakePixel (MakePoint x y1) streetColor | x <- ordRange x1 x2] -- horizontal road
     | otherwise = error "this road can be either \
         \ vertical or horizontal and not a diagonal"
     where
+        fuck = (MakeFigure . tryToRenderName)
         name = rawName ++ " st."
-        repaintStartIndex pixels = (middle pixels) - (middle name)
-        repaintStopIndex pixels  = (middle pixels) + (middle name)        
-        tryToRenderName pixels = if (length pixels >= (length name) + 4)
+        repaintStartIndex pixels = middle pixels - middle name
+        repaintStopIndex pixels  = middle pixels + middle name        
+        tryToRenderName pixels = if length pixels >= length name + 4
             then concat [ --OPTIMIZE DEFINITION!
                 take (repaintStartIndex pixels) pixels,
                 repaintWithString (" " ++ name ++ " ") (drop (repaintStartIndex pixels) (take ((repaintStopIndex pixels) + 3) pixels)),
-                drop ((repaintStopIndex pixels) + 3) pixels
+                drop (repaintStopIndex pixels + 3) pixels
                 ]
             else pixels
     

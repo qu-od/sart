@@ -7,16 +7,16 @@ import Painter
     )
 
 import Shapes 
-    ( Shape (MakeShape)
-    , line
+    ( Figure (MakeFigure)
+    , line        
     , box
     , building
     , street
     )
 
 import Routes
-    ( Route (MakeRoute)
-    , routePoints
+    (-- Route (MakeRoute)
+     route
     )
 
 -------------------------- QUESTIONS -------------------------------------------
@@ -25,7 +25,9 @@ import Routes
 -- Куда класть определения типов с конструкторами. В отдельный модуль?
 --
 
-------------------------------- TODO ------------------------------------------
+------------------------------- TODO -------------------------------------------
+-- Ultimate goal: automate routes making.
+    -- Apply 2 points in the city and let the program to decide how to lay it out!
 -- REFACTOR PAINTER IN A RECURSIVE MANNER. REDUCE RUNNING TIME
 -- figure out the rules of indentation and multiline expressions
 -- how to make exceptions for special cases? (pattern matching and guards will help)
@@ -34,7 +36,7 @@ import Routes
 
 
 ----------------------------------- TYPES --------------------------------------
-data Figure = MakeFigure Color Shape
+
 
 --------------------------- FUNCS FOR MAIN -------------------------------------
 
@@ -58,31 +60,38 @@ testPoints = map ptt [
     (134, 1) -- i=6
     ]
 
-figures :: [[Pixel]]
-figures = [ -- leading elements have higher priority in rendering
+testFigures :: [Figure]
+testFigures = [ -- leading elements have higher priority in rendering
+-- все названия мелкий придумывал, так что не надо тут
     building (pt 20 0) (pt 42 4) "TEST BUILDING 1",
-    building (pt 50 1) (pt 56 4) "бвкяж",
+    building (pt 50 1) (pt 56 4) "5букв",
     building (pt 40 4) (pt 60 6) "TEST BUILdinG 68",
-    building (pt 44 14) (pt 70 19) " в жопе города",
-    building (pt 74 4) (pt 80 6) "БЮБЮБДБД",
-    --building (pt 100 3) (pt 120 5) "Aboba",
-    street (pt 150 3) (pt 120 3) "Tаrhun",
+    building (pt 44 14) (pt 70 19) " в ебенях",
+    building (pt 74 4) (pt 80 6) "что-то",
+    -- 
+    street (pt 150 3) (pt 120 3) "Gayorgyeva",
     street (pt 100 5) (pt 150 5) "Svobody",
     street (pt 120 0) (pt 120 5) "Vo",
     street (pt 150 2) (pt 399 2) "TUPIKOVYI TYPIK",
-    street (pt 171 2) (pt 228 2) "автбобус",
-    paint '7' $ box (2, 2) (10, 5),
-    paint '5' $ box (5, 4) (30, 4),
-    paint 'g' $ line (40, 4) (45, 4),
-    paint 'o' $ line (5, 0) (30, 0),
-    paint 'g' $ line (5, 1) (30, 1),
-    paint 'У' $ line (25, 2) (30, 2),
-    paint 'Ж' $ line (5, 3) (30, 3),
-    paint 'H' $ routePoints $ zipWith pt [40, 44, 44] [4, 4, 14],
-    paint '0' $ routePoints $ zipWith pt [136, 149, 149, 10] [2, 2, 6, 6],
-    paint '4' $ routePoints $ zipWith pt [10, 10, 134, 134] [6, 4, 4, 1]
+    street (pt 171 2) (pt 228 2) "Бельфегоровская",
+    --
+    route '1' (zipWith pt [40, 44, 44] [4, 4, 14]),
+    route '2' (zipWith pt [136, 149, 149, 10] [2, 2, 6, 6]),
+    route '3' (zipWith pt [10, 10, 134, 134] [6, 4, 4, 1]),
+    --
+    MakeFigure $ paint '7' $ box (2, 2) (10, 5),
+    MakeFigure $ paint 'g' $ line (40, 4) (45, 4),
+    MakeFigure $ paint 'o' $ line (5, 0) (30, 0)
     ]
-    
 
+pixels :: Figure -> [Pixel]
+pixels (MakeFigure []) = [] 
+pixels (MakeFigure [px]) = [px]
+pixels (MakeFigure (px0:pxs)) = px0:pxs
+
+figuresToPixels :: [Figure] -> [Pixel]
+figuresToPixels = foldr (\fig acc -> pixels fig ++ acc) []
+
+--------------------------------------- MAIN -----------------------------------
 renderFrame :: IO ()
-renderFrame = putStr $ frame01 figures
+renderFrame = putStr $ frame01 $ figuresToPixels testFigures
