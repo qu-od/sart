@@ -366,4 +366,6 @@ frame01 figures =
     (matrixToString . frameMatrix . arrangePixels . dropOutOfBoundsPixels) (figures ++ backgroundPixels)
 
 
---------------------- 0.1.1 FRAME (Data Modules and types) ---------------------
+---------------- 0.1.2 FRAME (Data Modules and verbose types) ------------------
+foo :: String
+foo = "bar" -- new branch test
