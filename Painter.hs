@@ -5,11 +5,14 @@ module Painter
 , Frame
 , Direction (NoDirection, Up, Down, Left', Right')
 , Shape (EmptyShape, Building, StreetPD, StreetPP, Route)
+-- StreetPD deprecated after 0.1.2
 , Busstop (Intersection, Deadend, Extra) -- for advanced routes
+, ensureStreetPP
 , streetPDP2
 , streetPPLen
 , streetAxis
 , interpolate'
+, isStreet
 , streetRequiredError
 , frame012
 , paint -- deprecated
@@ -125,17 +128,16 @@ instance Show Direction where
                     \of the Direction type you've got there..."
 
 ---------------- Shape
-data Shape = 
-        -- All shapes could've been implemented with maps
-        -- (Map Name|Number Points|Whatever)
+data Shape = -- GENERALIZE ALL THOSE WITH A BOX AND A POLYLINE
         -- record syntax DISCOURAGED when multiple value constructors are used
+        -- ADDING DIFFERENT CONSTRUCTORS FOR A STREET WAS A MISTAKE))
     EmptyShape 
     | Building {
         name :: String,
         pt1 :: IntPoint,
         pt2 :: IntPoint
         }
-    | StreetPD {
+    | StreetPD { -- DEPRECATED after 0.1.2
         name :: String,
         pt :: IntPoint,
         dir :: Direction,
@@ -165,6 +167,14 @@ instance Show Shape where
         "Route #", show num, "Turns: ", show pts
         ]
 
+-- |Function takes both Street value constructors (StreetPD and StreetPP)
+-- |But if it is StreetPD, converts it to StreetPP
+-- |Костыли тоже надо уметь писать!
+ensureStreetPP :: Shape -> Shape
+ensureStreetPP st@(StreetPD name pt dir len) = StreetPP name pt (streetPDP2 st)
+ensureStreetPP st@(StreetPP _ _ _) = st
+ensureStreetPP _ = error "Street required"
+
 streetPDP2 :: Shape -> IntPoint
 streetPDP2 (StreetPD _ (MkIntPoint x y) dir len)
     | dir == Up     = p x (y-d)
@@ -177,7 +187,7 @@ streetPDP2 (StreetPD _ (MkIntPoint x y) dir len)
 streetPDP2 _ = 
     error "streetPDP2 funnction requires StreetPD and not any other Shape"
 
-streetPPLen :: Shape -> Int
+streetPPLen :: Shape -> Int -- bigPP
 streetPPLen (StreetPP _ (MkIntPoint x1 y1) (MkIntPoint x2 y2))
     | y1 == y2 = 1 + abs $ x2 - x1 -- horizontal
     | x1 == x2 = 1 + abs $ y2 - y1 -- vertical
@@ -195,14 +205,33 @@ streetAxis (StreetPD _ _ dir _)
     | otherwise = error "Unexpected street Direction"
 streetAxis (StreetPP _ (MkIntPoint x1 y1) (MkIntPoint x2 y2) )
     | x1 == x2 = "oY"
-    | y1 == y2 = "oY"
+    | y1 == y2 = "oX"
     | otherwise = error "Unexpected street Direction"
 streetAxis _ = streetRequiredError
 
+-- |that's basically a type "method"
 interpolate' :: Shape -> [IntPoint]
-interpolate' st@(StreetPD _ pt dir len) = 
-interpolate' st@(StreetPP _ pt1 pt2) = 
+interpolate' (StreetPD _ pt Up     len) = map (MkIntPoint (iX pt)) [iY pt - (len-1) .. iY pt]
+interpolate' (StreetPD _ pt Down   len) = map (MkIntPoint (iX pt)) [iY pt .. iY pt + (len-1)]
+interpolate' (StreetPD _ pt Left'  len) = map ((flip . MkIntPoint) (iY pt)) [iX pt - (len-1) .. iX pt]
+interpolate' (StreetPD _ pt Right' len) = map ((flip . MkIntPoint) (iY pt)) [iX pt .. iX pt + (len-1)]
+interpolate' st@(StreetPD _ pt _ len) = error "Unexpected Direction"
+interpolate' st@(StreetPP _ pt1 pt2)
+    | streetAxis st == "oX" = map ((flip . MkIntPoint) (iY pt1)) [leftX .. rightX]
+    | otherwise = map (MkIntPoint (iX pt1)) [upperY .. lowerY]
+    where 
+        pts = [pt1, pt2]
+        --leftX :: [IntPoint] -> Int
+        leftX  = minimum $ map iX pts
+        rightX = maximum $ map iX pts
+        upperY = minimum $ map iY pts
+        lowerY = maximum $ map iY pts
 interpolate' _ = streetRequiredError
+
+isStreet :: Shape -> Bool
+isStreet StreetPD {} = True -- record patterns OH MY!
+isStreet StreetPP {} = True
+isStreet _ = False
 
 -- which type need to be used?
 streetRequiredError :: a
@@ -212,15 +241,15 @@ streetRequiredError = error "There was a Shape... But there was no STREET!"
 data Busstop =
     -- record syntax DISCOURAGED when multiple value constructors are used
     Intersection {
-        street1 :: Shape,
-        street2 :: Shape,
+        streetOX :: Shape,
+        streetOY :: Shape,
         pPoint :: IntPoint
         } 
     | Deadend { -- every "start" and every "end" of the street 
         street :: Shape,
         pPoint :: IntPoint
         }
-    | Extra { -- in the middle of the street
+    | Extra { -- in the middle of the street --BAD NAMING NEPONYATNO NIHUIA
         street :: Shape,
         pPoint :: IntPoint
         }
@@ -459,4 +488,4 @@ showFrame :: Frame Char -> String
 showFrame = undefined
 
 frame012 :: ([Shape], [Busstop]) -> String
-frame012 = showFrame . frameMapFromPixels . dumpPixelsShape
+frame012 = showFrame . frameMapFromPixels . dumpPixels

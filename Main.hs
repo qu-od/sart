@@ -1,3 +1,5 @@
+{-# LANGUAGE ViewPatterns #-}
+
 import Painter
     ( IntPoint (MkIntPoint)
     , GenColor (MkGenColor)
@@ -5,11 +7,14 @@ import Painter
     , Frame
     , Direction (NoDirection, Up, Down, Left', Right')
     , Shape (EmptyShape, Building, StreetPD, StreetPP, Route)
+    -- StreetPD deprecated after 0.1.2
     , Busstop (Intersection, Deadend, Extra) -- for advanced routes
+    , ensureStreetPP
     , streetPDP2
     , streetPPLen
     , streetAxis
     , interpolate'
+    , isStreet
     , streetRequiredError
     , frame012
     , paint -- deprecated
@@ -98,14 +103,27 @@ testShapes = [ -- leading elements have higher priority in rendering
     Route 3 (zipWith p [10, 10, 134, 134]  [6, 4, 4, 1])
     ]
 
-isStreet :: Shape -> Bool
-isStreet StreetPD {} = True -- record patterns OH MY!
-isStreet StreetPP {} = True
-isStreet _ = False
-
 -- USE SETS THERE
+-- |Filter out vertical lines
+-- |Filter out horizontal lines
+-- |For each horizontal line find intersection with
+-- |Could be optimized with predicates that'll tell if intersection between
+-- -- |two streets is even possible given their endpoints
 intersectionsOfStreets :: [Shape] -> [Busstop]
-intersectionsOfStreets = undefined
+intersectionsOfStreets (map . ensureStreetPP -> sts) = [
+    Intersection stOX stOY (iX pt1 stOY, iY pt1 stOX) |
+    stOX <- stsOX, stOY <- stOY,
+    stOX `couldIntersect` stOY 
+    ]
+    where
+        stsOX = filter (streetAxis == "oX")
+        stsOY = filter (streetAxis == "oY")
+        xAligned (StreetPP _ st1p1 st1p2) (StreetPP _ st2p1 st2p2) =
+            iX st1p1 <= iX st2p1 <= iX st1p2
+        yAligned (StreetPP _ st1p1 st1p2) (StreetPP _ st2p1 st2p2) =
+            iY st2p1 <= iY st1p1 <= iY st2p2
+        stX `shouldIntersect` stY = xAligned && yAligned
+    
 
 -- |should we make it return a pair instead of a list to 
 -- -- |highlight the fact that there are 2 deadends?
@@ -121,7 +139,8 @@ deadendsOfStreet _ = streetRequiredError
 -- |how extra busstops are added.. (whit papir)
 -- |let distance between busstops be D (defaultBusstopDistance :: Int)
 -- |then there are D-1 empty street points between them
--- |every deadend is a busstop by default
+-- |every deadend and an intersection is a busstop by default
+-- -- |and they'll be finded by other functions
 -- |busstops are added from the top or from the left
 -- -- |(depends on street direction)
 -- |and let's be generous not to delete last busstop just before pt2
@@ -131,11 +150,12 @@ deadendsOfStreet _ = streetRequiredError
 defaultBusstopDistance :: Int
 defaultBusstopDistance = 5
 
-extraBusstopsForStreet :: Shape -> [Busstop]
-extraBusstopsForStreet st = 
-    case st of  (StreetPD _ pt dir len) -> extraBusstops $ minEnd p1 (streetPDP2 st)
-                (StreetPP _ pt1 pt2) -> extraBusstops $ minEnd pt1 pt2
-                _ -> streetRequiredError
+-- | OLD UGLY VARIANT. DEPRECATED
+extraBusstopsForStreet' :: Shape -> [Busstop] 
+extraBusstopsForStreet' st = 
+    case st of (StreetPD _ pt dir len) -> extraBusstops $ minEnd p1 (streetPDP2 st)
+               (StreetPP _ pt1 pt2) -> extraBusstops $ minEnd pt1 pt2
+               _ -> streetRequiredError
     where
         minEnd p1 p2 = MkIntPoint (min (iX p1) (iX p2)) (min (iY p1) (iY p2))
         d = defaultBusstopDistance
@@ -146,23 +166,15 @@ extraBusstopsForStreet st =
                 else -- if streetAxis st == "oY"   -- p1 must be the upper end   -- iterating ys
                     map (MkIntPoint (iX p1)) (takeWhile (<= ((iY p1) + len - 2)) (iterate (+d) (iY p1)))
         
--- можно было итерироваться по оси и проверять остаток от деления на D. но это бы не
--- REWRITE
-extraBusstopsForStreet' :: Shape -> [Busstop]
-extraBusstopsForStreet' st = ctgvhbjnknmk_UNDEFINED
-    case st of  (StreetPD _ pt dir len) -> extraBusstops $ minEnd p1 (streetPDP2 st)
-                (StreetPP _ pt1 pt2) -> extraBusstops $ minEnd pt1 pt2
-                _ -> streetRequiredError
+-- Other implementation using (mod D == 0) predicate
+-- already assuming that is a street indeed
+extraBusstopsForStreet :: Shape -> [Busstop]
+extraBusstopsForStreet st = map (Extra st) (filter (isBusstop st) (interpolate st))
     where
-        minEnd p1 p2 = MkIntPoint (min (iX p1) (iX p2)) (min (iY p1) (iY p2))
         d = defaultBusstopDistance
-        extraBusstops p1 = map (Extra st ) (extraBusstopsPoints p1) --PARTIAL APPLICATION WITH MAP WOWIE
-        extraBusstopsPoints p1 = if streetAxis st == "oX"  
-                then -- p1 must be the left end  -- iterating xs
-                    map (flip . MkIntPoint (iY p1)) (takeWhile (<= ((iX p1) + len - 2)) (iterate (+d) (iX p1)))
-                else -- if streetAxis st == "oY"   -- p1 must be the upper end   -- iterating ys
-                    map (MkIntPoint (iX p1)) (takeWhile (<= ((iY p1) + len - 2)) (iterate (+d) (iY p1)))
-
+        isBusstop st p = if streetAxis st == "oX"
+            then (iX p 'mod' d) == 0
+            else (iY p 'mod' d) == 0
                             
 testPlaces :: [Busstop]
 testPlaces = concat [
