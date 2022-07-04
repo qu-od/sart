@@ -5,8 +5,12 @@ module Painter
 , Frame
 , Direction (NoDirection, Up, Down, Left', Right')
 , Shape (EmptyShape, Building, StreetPD, StreetPP, Route)
-, Place (Intersection, Deadend, Busstop) -- for advanced routes
-, stPDP2
+, Busstop (Intersection, Deadend, Extra) -- for advanced routes
+, streetPDP2
+, streetPPLen
+, streetAxis
+, interpolate'
+, streetRequiredError
 , frame012
 , paint -- deprecated
 , Point (MakePoint) -- deprecated
@@ -161,8 +165,8 @@ instance Show Shape where
         "Route #", show num, "Turns: ", show pts
         ]
 
-stPDP2 :: Shape -> IntPoint
-stPDP2 (StreetPD _ (MkIntPoint x y) dir len)
+streetPDP2 :: Shape -> IntPoint
+streetPDP2 (StreetPD _ (MkIntPoint x y) dir len)
     | dir == Up     = p x (y-d)
     | dir == Down   = p x (y+d)
     | dir == Left'  = p (x-d) y
@@ -170,10 +174,42 @@ stPDP2 (StreetPD _ (MkIntPoint x y) dir len)
     where 
         p = MkIntPoint
         d = len - 1
-stPDP2 _ = error "pt2 requires StreetPD and not any other Shape"
+streetPDP2 _ = 
+    error "streetPDP2 funnction requires StreetPD and not any other Shape"
 
--------------- Place
-data Place =
+streetPPLen :: Shape -> Int
+streetPPLen (StreetPP _ (MkIntPoint x1 y1) (MkIntPoint x2 y2))
+    | y1 == y2 = 1 + abs $ x2 - x1 -- horizontal
+    | x1 == x2 = 1 + abs $ y2 - y1 -- vertical
+    | otherwise = error "Diagonal street occured which is forbidden"
+streetPPLen _ =
+    error "streetPPLen function requires StreetPP and not any other Shape"
+
+-- |single-point street case is not handled specifically
+streetAxis :: Shape -> String
+streetAxis (StreetPD _ _ dir _)
+    | dir == Up     = "oY"
+    | dir == Down   = "oY"
+    | dir == Left'  = "oX"
+    | dir == Right' = "oX"
+    | otherwise = error "Unexpected street Direction"
+streetAxis (StreetPP _ (MkIntPoint x1 y1) (MkIntPoint x2 y2) )
+    | x1 == x2 = "oY"
+    | y1 == y2 = "oY"
+    | otherwise = error "Unexpected street Direction"
+streetAxis _ = streetRequiredError
+
+interpolate' :: Shape -> [IntPoint]
+interpolate' st@(StreetPD _ pt dir len) = 
+interpolate' st@(StreetPP _ pt1 pt2) = 
+interpolate' _ = streetRequiredError
+
+-- which type need to be used?
+streetRequiredError :: a
+streetRequiredError = error "There was a Shape... But there was no STREET!"
+
+-------------- Busstop
+data Busstop =
     -- record syntax DISCOURAGED when multiple value constructors are used
     Intersection {
         street1 :: Shape,
@@ -184,12 +220,12 @@ data Place =
         street :: Shape,
         pPoint :: IntPoint
         }
-    | Busstop { -- on the street
+    | Extra { -- in the middle of the street
         street :: Shape,
         pPoint :: IntPoint
         }
 
-instance Show Place where
+instance Show Busstop where
     show (Intersection st1 st2 pt) = concat [
         "Place \"Intersection\" of ",
         name st1, "st. and ",
@@ -198,7 +234,7 @@ instance Show Place where
         ]
     show (Deadend st pt) =
         "Place \"Deadend\" of " ++ name st ++ "st. at " ++ xy pt
-    show (Busstop st pt) = 
+    show (Extra st pt) = 
         "Place \"Busstop\" on a " ++ name st ++ "st. at " ++ xy pt
 
 
@@ -406,8 +442,15 @@ frame01 figures =
         -- Frame Char = Map IntPoint (GenColor Char)
 -- 4. Form multiline string from a Frame
 
-dumpPixels :: ([Shape], [Place]) -> [GenPixel Char]
-dumpPixels = undefined
+pixelsFromShapes :: [Shape] -> [GenPixel Char]
+pixelsFromShapes = undefined
+
+pixelsFromBusstops :: [Busstop] -> [GenPixel Char]
+pixelsFromBusstops = undefined
+
+dumpPixels :: ([Shape], [Busstop]) -> [GenPixel Char]
+dumpPixels shapes busstops = 
+    pixelsFromShapes shapes ++ pixelsFromBusstops busstops
 
 frameMapFromPixels :: [GenPixel Char] -> Frame Char
 frameMapFromPixels = undefined
@@ -415,5 +458,5 @@ frameMapFromPixels = undefined
 showFrame :: Frame Char -> String
 showFrame = undefined
 
-frame012 :: ([Shape], [Place]) -> String
-frame012 = showFrame . frameMapFromPixels . dumpPixels
+frame012 :: ([Shape], [Busstop]) -> String
+frame012 = showFrame . frameMapFromPixels . dumpPixelsShape
