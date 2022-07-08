@@ -108,7 +108,7 @@ subctFrom10 :: (Num a) => a -> a
 subctFrom10 = (-) 10
 
 subct10 :: (Num a) => a -> a
-subct10 = (flip (-)) 10 -- WTF THOSE PARENS ARE REDUNDANT??!
+subct10 = (flip (-)) 10 -- WTF THOSE PARENS ARE REDUNDANT??! yep. cuz part. app.
 
 listOfMultiplications :: (Enum a, Num a) => [a -> a]
 listOfMultiplications = map (*) [0..]

@@ -127,6 +127,9 @@ instance Show Direction where
     show AdAstra = "That's some strange nullary value constructor \
                     \of the Direction type you've got there..."
 
+----------------- Polyline
+-- Polyline = DATA or TYPE?
+
 ---------------- Shape
 data Shape = -- GENERALIZE ALL THOSE WITH A BOX AND A POLYLINE
         -- record syntax DISCOURAGED when multiple value constructors are used
@@ -172,7 +175,7 @@ instance Show Shape where
 -- |Костыли тоже надо уметь писать!
 ensureStreetPP :: Shape -> Shape
 ensureStreetPP st@(StreetPD name pt dir len) = StreetPP name pt (streetPDP2 st)
-ensureStreetPP st@(StreetPP _ _ _) = st
+ensureStreetPP st@StreetPP {} = st
 ensureStreetPP _ = error "Street required"
 
 streetPDP2 :: Shape -> IntPoint
@@ -189,8 +192,8 @@ streetPDP2 _ =
 
 streetPPLen :: Shape -> Int -- bigPP
 streetPPLen (StreetPP _ (MkIntPoint x1 y1) (MkIntPoint x2 y2))
-    | y1 == y2 = 1 + abs $ x2 - x1 -- horizontal
-    | x1 == x2 = 1 + abs $ y2 - y1 -- vertical
+    | y1 == y2 = 1 + abs (x2 - x1) -- horizontal
+    | x1 == x2 = 1 + abs (y2 - y1) -- vertical
     | otherwise = error "Diagonal street occured which is forbidden"
 streetPPLen _ =
     error "streetPPLen function requires StreetPP and not any other Shape"
@@ -211,13 +214,18 @@ streetAxis _ = streetRequiredError
 
 -- |that's basically a type "method"
 interpolate' :: Shape -> [IntPoint]
-interpolate' (StreetPD _ pt Up     len) = map (MkIntPoint (iX pt)) [iY pt - (len-1) .. iY pt]
-interpolate' (StreetPD _ pt Down   len) = map (MkIntPoint (iX pt)) [iY pt .. iY pt + (len-1)]
-interpolate' (StreetPD _ pt Left'  len) = map ((flip . MkIntPoint) (iY pt)) [iX pt - (len-1) .. iX pt]
-interpolate' (StreetPD _ pt Right' len) = map ((flip . MkIntPoint) (iY pt)) [iX pt .. iX pt + (len-1)]
+interpolate' (StreetPD _ pt Up len) = 
+    map (MkIntPoint (iX pt)) [iY pt - (len-1) .. iY pt]
+interpolate' (StreetPD _ pt Down len) =
+    map (MkIntPoint (iX pt)) [iY pt .. iY pt + (len-1)]
+interpolate' (StreetPD _ pt Left' len) =
+    map (`MkIntPoint` iY pt) [iX pt - (len-1) .. iX pt] --INFIX NOTAION INSTEAD OF USING FLIP
+interpolate' (StreetPD _ pt Right' len) =
+    map (`MkIntPoint` iY pt) [iX pt .. iX pt + (len-1)]
 interpolate' st@(StreetPD _ pt _ len) = error "Unexpected Direction"
 interpolate' st@(StreetPP _ pt1 pt2)
-    | streetAxis st == "oX" = map ((flip . MkIntPoint) (iY pt1)) [leftX .. rightX]
+    | streetAxis st == "oX" = 
+        map (`MkIntPoint` iY pt1) [leftX .. rightX]
     | otherwise = map (MkIntPoint (iX pt1)) [upperY .. lowerY]
     where 
         pts = [pt1, pt2]
@@ -257,14 +265,14 @@ data Busstop =
 instance Show Busstop where
     show (Intersection st1 st2 pt) = concat [
         "Place \"Intersection\" of ",
-        name st1, "st. and ",
-        name st2, "st. at",
+        name st1, " st. and ",
+        name st2, " st. at",
         xy pt
         ]
     show (Deadend st pt) =
-        "Place \"Deadend\" of " ++ name st ++ "st. at " ++ xy pt
+        "Place \"Deadend\" of " ++ name st ++ " st. at " ++ xy pt
     show (Extra st pt) = 
-        "Place \"Busstop\" on a " ++ name st ++ "st. at " ++ xy pt
+        "Place \"ExtraBusstop\" on a " ++ name st ++ " st. at " ++ xy pt
 
 
 --------------------------------- CONSTS ---------------------------------------
@@ -464,12 +472,22 @@ frame01 figures =
 
 ---------------- 0.1.2 FRAME (Data Modules and verbose types) ------------------
 ------ frame012 ALGORITHM ------
--- 1. Get Shapes and Places
--- 2. Form colored pixels for every Shape and Place
+-- 1. Get Shapes and Places (StreetPDs prohibited!)
+-- 2. Form colored pixels for every Shape and Place (names could be rendered)
 -- 3. Dump them in a Frame
     -- Duplicates are removed because 
         -- Frame Char = Map IntPoint (GenColor Char)
 -- 4. Form multiline string from a Frame
+
+colored :: Shape -> [GenPixel Char]
+colored (Building name (MkIntPoint x1 y1) (MkIntPoint x2 y2)) = undefined
+colored st@(StreetPP name (MkIntPoint x1 y1) (MkIntPoint x2 y2))
+    | streetAxis st == "oX" = undefined
+    | otherwise = undefined
+colored (Route name pts) = undefined
+colored StreetPD {} =
+    error "StreetPDs prohibited. Convert them to StreetPPs"
+colored _ = error "Unexpected Shape recieved"
 
 pixelsFromShapes :: [Shape] -> [GenPixel Char]
 pixelsFromShapes = undefined
@@ -478,7 +496,7 @@ pixelsFromBusstops :: [Busstop] -> [GenPixel Char]
 pixelsFromBusstops = undefined
 
 dumpPixels :: ([Shape], [Busstop]) -> [GenPixel Char]
-dumpPixels shapes busstops = 
+dumpPixels (shapes, busstops) = 
     pixelsFromShapes shapes ++ pixelsFromBusstops busstops
 
 frameMapFromPixels :: [GenPixel Char] -> Frame Char

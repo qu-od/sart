@@ -88,9 +88,9 @@ testShapes = [ -- leading elements have higher priority in rendering
     Building " в ебенях"        (p 44 14) (p 70 19),
     Building "что-то"           (p 74 4)  (p 80 6),
     -- 
-    StreetPD "Vo"               (p 150 5) Left'  50,
-    StreetPD "TUPIKOVYI TYPIK"  (p 150 3) Right' 20,
-    StreetPD "Бельфегоровская"  (p 50 5)  Up     5,
+    ensureStreetPP $ StreetPD "Vo"               (p 150 5) Left'  50,
+    ensureStreetPP $ StreetPD "TUPIKOVYI TYPIK"  (p 150 3) Right' 20,
+    ensureStreetPP $ StreetPD "Бельфегоровская"  (p 50 5)  Up     5,
     --
     StreetPP "Gayorgyeva"       (p 150 3) (p 120 3),
     StreetPP "Svobody"          (p 100 5) (p 150 5),
@@ -103,26 +103,41 @@ testShapes = [ -- leading elements have higher priority in rendering
     Route 3 (zipWith p [10, 10, 134, 134]  [6, 4, 4, 1])
     ]
 
--- USE SETS THERE
+-- WHY tf i need to reimplement all those ? (why getters haven't been imported)
+iX :: IntPoint -> Int 
+iX (MkIntPoint x _) = x
+iY :: IntPoint -> Int
+iY (MkIntPoint _ y) = y
+pt1 :: Shape -> IntPoint
+pt1 (StreetPP _ pt1 _) = pt1
+pt1 _ = error "StreetPP required"
+pt2 :: Shape -> IntPoint
+pt2 (StreetPP _ _ pt2) = pt2
+pt2 _ = error "StreetPP required"
+
+
+-- USE SETS THERE (to dumb too slow, so I won't)
 -- |Filter out vertical lines
 -- |Filter out horizontal lines
 -- |For each horizontal line find intersection with
 -- |Could be optimized with predicates that'll tell if intersection between
 -- -- |two streets is even possible given their endpoints
 intersectionsOfStreets :: [Shape] -> [Busstop]
-intersectionsOfStreets (map . ensureStreetPP -> sts) = [
-    Intersection stOX stOY (iX pt1 stOY, iY pt1 stOX) |
-    stOX <- stsOX, stOY <- stOY,
-    stOX `couldIntersect` stOY 
+intersectionsOfStreets (map ensureStreetPP -> sts) = [ --part. app. of map
+    Intersection stOX stOY (MkIntPoint (iX (pt1 stOY)) (iY (pt1 stOX))) |
+    stOX <- stsOX sts, stOY <- stsOY sts,
+    stOX `shouldIntersect` stOY 
     ]
     where
-        stsOX = filter (streetAxis == "oX")
-        stsOY = filter (streetAxis == "oY")
+        stsOX = filter ((== "oX") . streetAxis)
+        stsOY = filter ((== "oY") . streetAxis)
         xAligned (StreetPP _ st1p1 st1p2) (StreetPP _ st2p1 st2p2) =
-            iX st1p1 <= iX st2p1 <= iX st1p2
+            (iX st1p1 <= iX st2p1) && (iX st2p1 <= iX st1p2)
+        xAligned _ _ = error "StreetPP required"
         yAligned (StreetPP _ st1p1 st1p2) (StreetPP _ st2p1 st2p2) =
-            iY st2p1 <= iY st1p1 <= iY st2p2
-        stX `shouldIntersect` stY = xAligned && yAligned
+            (iY st2p1 <= iY st1p1) && (iY st1p1 <= iY st2p2)
+        yAligned _ _ = error "StreetPP required"
+        stX `shouldIntersect` stY = xAligned stX stY && yAligned stX stY
     
 
 -- |should we make it return a pair instead of a list to 
@@ -151,33 +166,33 @@ defaultBusstopDistance :: Int
 defaultBusstopDistance = 5
 
 -- | OLD UGLY VARIANT. DEPRECATED
-extraBusstopsForStreet' :: Shape -> [Busstop] 
-extraBusstopsForStreet' st = 
-    case st of (StreetPD _ pt dir len) -> extraBusstops $ minEnd p1 (streetPDP2 st)
-               (StreetPP _ pt1 pt2) -> extraBusstops $ minEnd pt1 pt2
-               _ -> streetRequiredError
-    where
-        minEnd p1 p2 = MkIntPoint (min (iX p1) (iX p2)) (min (iY p1) (iY p2))
-        d = defaultBusstopDistance
-        extraBusstops p1 = map (Extra st ) (extraBusstopsPoints p1) --PARTIAL APPLICATION WITH MAP WOWIE
-        extraBusstopsPoints p1 = if streetAxis st == "oX"  
-                then -- p1 must be the left end  -- iterating xs
-                    map (flip . MkIntPoint (iY p1)) (takeWhile (<= ((iX p1) + len - 2)) (iterate (+d) (iX p1)))
-                else -- if streetAxis st == "oY"   -- p1 must be the upper end   -- iterating ys
-                    map (MkIntPoint (iX p1)) (takeWhile (<= ((iY p1) + len - 2)) (iterate (+d) (iY p1)))
+--extraBusstopsForStreet' :: Shape -> [Busstop] 
+--extraBusstopsForStreet' st = 
+    --case st of (StreetPD _ pt dir len) -> extraBusstops $ minEnd p1 (streetPDP2 st)
+               --(StreetPP _ pt1 pt2) -> extraBusstops $ minEnd pt1 pt2
+               --_ -> streetRequiredError
+    --where
+        --minEnd p1 p2 = MkIntPoint (min (iX p1) (iX p2)) (min (iY p1) (iY p2))
+        --d = defaultBusstopDistance
+        --extraBusstops p1 = map (Extra st ) (extraBusstopsPoints p1) --PARTIAL APPLICATION WITH MAP WOWIE
+        --extraBusstopsPoints p1 = if streetAxis st == "oX"  
+                --then -- p1 must be the left end  -- iterating xs
+                    --map (`MkIntPoint` iY p1) (takeWhile (<= (iX p1 + len - 2)) (iterate (+d) (iX p1)))
+                --else -- if streetAxis st == "oY"   -- p1 must be the upper end   -- iterating ys
+                    --map (MkIntPoint (iX p1)) (takeWhile (<= ((iY p1) + len - 2)) (iterate (+d) (iY p1)))
         
 -- Other implementation using (mod D == 0) predicate
 -- already assuming that is a street indeed
 extraBusstopsForStreet :: Shape -> [Busstop]
-extraBusstopsForStreet st = map (Extra st) (filter (isBusstop st) (interpolate st))
+extraBusstopsForStreet st = map (Extra st) (filter (isBusstop st) (interpolate' st))
     where
         d = defaultBusstopDistance
         isBusstop st p = if streetAxis st == "oX"
-            then (iX p 'mod' d) == 0
-            else (iY p 'mod' d) == 0
+            then (iX p `mod` d) == 0
+            else (iY p `mod` d) == 0
                             
-testPlaces :: [Busstop]
-testPlaces = concat [
+testBusstops :: [Busstop]
+testBusstops = concat [
     intersectionsOfStreets streets,
     concatMap deadendsOfStreet streets, 
     concatMap extraBusstopsForStreet streets -- concatMap OH MY!
@@ -188,4 +203,4 @@ testPlaces = concat [
 
 --------------------------------------- MAIN -----------------------------------
 renderFrame :: IO ()
-renderFrame = putStr $ frame012 (testShapes, testPlaces)
+renderFrame = putStr $ frame012 (testShapes, testBusstops)
