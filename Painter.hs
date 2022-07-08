@@ -22,7 +22,7 @@ module Painter
 ) where
 
 import Data.List ( 
-    nub, sort, reverse
+    nub, sort, reverse, groupBy
     )
 import Data.Char (
     isUpper, isDigit, isLower
@@ -30,6 +30,7 @@ import Data.Char (
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Function ( on )
+import Data.Maybe (fromMaybe)
 
 --------------- OLD TYPES (deprecated since 0.0.1) -----------------------------
 data Point = MakePoint {getX :: Int, getY :: Int} deriving (Show, Eq, Ord)
@@ -48,6 +49,7 @@ instance Eq IntPoint where
     MkIntPoint x1 y1 == MkIntPoint x2 y2 = (x1 == x2) && (y1 == y2)
     MkIntPoint x1 y1 /= MkIntPoint x2 y2 = (x1 /= x2) || (y1 /= y2)
     
+-- |to use type as a key in Map, this type must be ordered
 instance Ord IntPoint where
     compare (MkIntPoint x1 y1) (MkIntPoint x2 y2)
         | y1 /= y2 = compare y1 y2
@@ -71,6 +73,18 @@ instance Show IntPoint where
 -- shorter string for a IntPoint
 xy :: IntPoint -> String
 xy (MkIntPoint x y) = "X=" ++ show x ++ ", Y=" ++ show y
+
+leftX :: [IntPoint] -> Int
+leftX = minimum . (map iX)
+
+rightX :: [IntPoint] -> Int
+rightX = maximum . (map iX)
+
+upperY :: [IntPoint] -> Int
+upperY = minimum . (map iY)
+
+lowerY :: [IntPoint] -> Int
+lowerY = maximum . (map iY)
 
 --------------------- OTHER TYPES 0.1.1 (Maps and Sets) ------------------------
 --------------- GenColor
@@ -97,6 +111,9 @@ gPx (MkGenPixel pt color) = xy pt ++ show color
 -- instance (Show a) => Show (MapPixel a) where -- CANNOT INSTANTIATE TYPE SYNONYMS WTF
      --show pts clrs = show "MapPixel coords"
 --showMapPx (Map.Map pt genColor) = xy pt ++ show genColor --WHY Map.Map is not in scope?
+
+toPairs' :: [GenPixel Char] -> [(IntPoint, GenColor Char)]
+toPairs' pixels = [(p, color) | (MkGenPixel p color) <- pixels]
 
 -------------- Frame
 type Frame a = Map.Map IntPoint (GenColor a)
@@ -213,7 +230,21 @@ streetAxis (StreetPP _ (MkIntPoint x1 y1) (MkIntPoint x2 y2) )
 streetAxis _ = streetRequiredError
 
 -- |that's basically a type "method"
+-- |function doesn't paint buildings' walls into special color
+-- -- |and doesn't render name of a shape
 interpolate' :: Shape -> [IntPoint]
+interpolate' (Building _ pt1 pt2) = [
+    MkIntPoint x y 
+    | x <- [leftX pts .. rightX pts], y <- [upperY pts .. lowerY pts]
+    ]
+    where 
+        pts = [pt1, pt2]
+interpolate' (Route _ []) = []
+interpolate' (Route _ [pt]) = [pt]
+interpolate' (Route _ (pt1:pt2:pts)) = 
+        init (interpolate' (StreetPP "route section" pt1 pt2))
+        ++ interpolate' (Route 0 (pt2:pts))
+interpolate' EmptyShape = []
 interpolate' (StreetPD _ pt Up len) = 
     map (MkIntPoint (iX pt)) [iY pt - (len-1) .. iY pt]
 interpolate' (StreetPD _ pt Down len) =
@@ -225,16 +256,10 @@ interpolate' (StreetPD _ pt Right' len) =
 interpolate' st@(StreetPD _ pt _ len) = error "Unexpected Direction"
 interpolate' st@(StreetPP _ pt1 pt2)
     | streetAxis st == "oX" = 
-        map (`MkIntPoint` iY pt1) [leftX .. rightX]
-    | otherwise = map (MkIntPoint (iX pt1)) [upperY .. lowerY]
+        map (`MkIntPoint` iY pt1) [leftX pts .. rightX pts]
+    | otherwise = map (MkIntPoint (iX pt1)) [upperY pts .. lowerY pts]
     where 
         pts = [pt1, pt2]
-        --leftX :: [IntPoint] -> Int
-        leftX  = minimum $ map iX pts
-        rightX = maximum $ map iX pts
-        upperY = minimum $ map iY pts
-        lowerY = maximum $ map iY pts
-interpolate' _ = streetRequiredError
 
 isStreet :: Shape -> Bool
 isStreet StreetPD {} = True -- record patterns OH MY!
@@ -300,7 +325,7 @@ palette = Map.fromList [
     ("route",            c '^'), -- if it won't be a number-char one time
     ("intersection",     c '+'),
     ("deadend",          c '~'),
-    ("busstop",          c '*'),
+    ("extra busstop",    c '*'),
     ("route vertical",   c '|'), -- for advanced routes maybe
     ("route horizontal", c '-')  -- for advanced routes maybe
     ]
@@ -309,7 +334,19 @@ palette = Map.fromList [
 backgroundColor00x :: Color --deprecated
 backgroundColor00x = MakeColor ' '
 
+backgroundPxs :: [GenPixel Char]
+backgroundPxs = [
+    MkGenPixel (MkIntPoint x y) (lookupColor "background") 
+    | y <- screenYs, x <- screenXs
+    ]
 
+lookupColor :: String -> GenColor Char
+lookupColor string = 
+    fromMaybe (error "No color in palette for that stuff you requested")
+    (Map.lookup string palette)
+
+colored :: String -> [IntPoint] -> [GenPixel Char]
+colored colorKey = map (`MkGenPixel` lookupColor colorKey) --oh my
 
 --------------------------------- WHEELS ---------------------------------------
 scnd :: (a, b, c) -> b
@@ -467,43 +504,73 @@ matrixToString pxsMatrix = unlines $ map pixelsLineToString pxsMatrix
 -- takes a list of (completely) unsorted pixels
 frame01 :: [Pixel] -> String
 frame01 figures = 
-    (matrixToString . frameMatrix . arrangePixels . dropOutOfBoundsPixels) (figures ++ backgroundPixels)
+    (matrixToString . frameMatrix . arrangePixels . dropOutOfBoundsPixels)
+    (figures ++ backgroundPixels)
 
 
 ---------------- 0.1.2 FRAME (Data Modules and verbose types) ------------------
 ------ frame012 ALGORITHM ------
--- 1. Get Shapes and Places (StreetPDs prohibited!)
--- 2. Form colored pixels for every Shape and Place (names could be rendered)
--- 3. Dump them in a Frame
-    -- Duplicates are removed because 
-        -- Frame Char = Map IntPoint (GenColor Char)
--- 4. Form multiline string from a Frame
+-- |1. Get Shapes and Places (StreetPDs prohibited!)
+-- |2. Form colored pixels for every Shape and Place
+-- -- |Names could be rendered at that point (but won't)
+-- -- |Also add background Pixels there
+-- |3. Dump them in a Frame
+-- -- |Duplicates are removed and Pixels ordered by coords because
+-- -- -- |Frame Char = Map IntPoint (GenColor Char)
+-- |4. Take only that pixels which are in-bouds of a frame coord matrix
+-- |5. Form multiline string from a Frame
 
-colored :: Shape -> [GenPixel Char]
-colored (Building name (MkIntPoint x1 y1) (MkIntPoint x2 y2)) = undefined
-colored st@(StreetPP name (MkIntPoint x1 y1) (MkIntPoint x2 y2))
-    | streetAxis st == "oX" = undefined
-    | otherwise = undefined
-colored (Route name pts) = undefined
-colored StreetPD {} =
+pixelsFromShape :: Shape -> [GenPixel Char]
+pixelsFromShape bdg@Building {} = colored "building wall" (interpolate' bdg)
+pixelsFromShape st@StreetPP {} = colored "street" (interpolate' st)
+pixelsFromShape route@Route {} = colored "route" (interpolate' route)
+pixelsFromShape StreetPD {} =
     error "StreetPDs prohibited. Convert them to StreetPPs"
-colored _ = error "Unexpected Shape recieved"
+pixelsFromShape _ = error "Unexpected Shape recieved"
 
-pixelsFromShapes :: [Shape] -> [GenPixel Char]
-pixelsFromShapes = undefined
+-- |won't do a function for retrieving single pixel from a busstop because of
+-- -- |generalization
+-- |I mean may be we'll want a list of pixels
+-- -- |from a single busstop in the future!
+pixelsFromBusstop :: Busstop -> [GenPixel Char]
+pixelsFromBusstop (Intersection _ _ p) =
+    [MkGenPixel p $ lookupColor "intersection"]
+pixelsFromBusstop (Deadend _ p) = [MkGenPixel p $ lookupColor "deadend"]
+pixelsFromBusstop (Extra _ p) = [MkGenPixel p $ lookupColor "extra busstop"]
 
-pixelsFromBusstops :: [Busstop] -> [GenPixel Char]
-pixelsFromBusstops = undefined
-
+-------frame 012 pipeline
+-- DUPLICATION REMOVAL NEEDS A FIX
 dumpPixels :: ([Shape], [Busstop]) -> [GenPixel Char]
-dumpPixels (shapes, busstops) = 
-    pixelsFromShapes shapes ++ pixelsFromBusstops busstops
+--dumpPixels (shapes, busstops) = concatMap concatMap [ --YEEEEEEEEEEEEESS!!!
+dumpPixels (shapes, busstops) =
+    backgroundPxs
+    ++ concatMap pixelsFromBusstop busstops
+    ++ concatMap pixelsFromShape shapes
 
+-- |Map.fromList should also remove duplicates
 frameMapFromPixels :: [GenPixel Char] -> Frame Char
-frameMapFromPixels = undefined
+--frameMapFromPixels = Map.fromList toPairs' -- WRONG!
+frameMapFromPixels = Map.fromList . toPairs' -- RIGHT!
 
+cropFrameBounds :: Frame Char -> Frame Char
+cropFrameBounds = Map.fromList . filter inBounds . Map.toList
+    where inBounds (MkIntPoint x y, _) = x `elem` screenXs && y `elem` screenYs
+
+-- |Convert "Frame" Map to list of pairs
+-- -- |Namely pairs of (IntPoint, GenColor Char)
+-- |Group that list by iY of the Point. We'll get Matrix of pairs Then
+-- |Flatten chars in every line of pair-matrix. We'll get list of strings
+-- |Join strings with newline chars. We'll get a multiline string to show
 showFrame :: Frame Char -> String
-showFrame = undefined
+showFrame frame = ans
+    where -- IMPERATIVE_DRIVEN DEVELOPMENT BITCH
+        pixelPairs = Map.toList frame
+        matrixOfPixelPairs = 
+            groupBy (\(p1, _) (p2, _) -> iY p1 == iY p2) pixelPairs
+        pixelPairsListToLine = 
+            map (\(_, MkGenColor char) -> char)
+        ans = unlines $ map pixelPairsListToLine matrixOfPixelPairs
 
+---------frame012
 frame012 :: ([Shape], [Busstop]) -> String
-frame012 = showFrame . frameMapFromPixels . dumpPixels
+frame012 = showFrame . cropFrameBounds . frameMapFromPixels . dumpPixels
