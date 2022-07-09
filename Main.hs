@@ -28,6 +28,15 @@ import Shapes
     , street -- deprecated  
     )
 
+import Data.Char (digitToInt)
+import Control.Monad 
+    ( when
+    , sequence
+    , forM
+    , mapM
+    , forever
+    )
+
 --import GHC.Stack (HasCallStack)
 
 
@@ -207,8 +216,34 @@ testBusstops = concat [
 renderFrame :: String
 renderFrame = frame012 (testShapes, testBusstops)
 
+renderFrameWithUserBusstop :: IntPoint -> String
+renderFrameWithUserBusstop intPoint =
+    frame012 (testShapes, testBusstops ++ [Extra EmptyShape intPoint])
+
+putBusstops :: IO ()
+putBusstops = forever $ do
+    putStr "type X value: "
+    x <- getLine
+    putStr "type Y value: "
+    y <- getLine
+    putStrLn $ "x=" ++ x ++ ", y=" ++ y
+    putStrLn $ renderFrameWithUserBusstop $ MkIntPoint (read x :: Int) (read y :: Int)
+    return ()
+
+updatePoint :: IntPoint -> Char -> IntPoint
+updatePoint pt char
+    | char ==  'a' = MkIntPoint (iX pt - 1) (iY pt)
+    | char ==  'd' = MkIntPoint (iX pt + 1) (iY pt)
+    | char ==  'w' = MkIntPoint (iX pt) (iY pt - 1)
+    | char ==  's' = MkIntPoint (iX pt) (iY pt + 1)
+    | otherwise = error $ "Wrong char for the movement direction." ++ [char]
+
+startingPoint :: IntPoint
+startingPoint = MkIntPoint 60 37
+
 main :: IO ()
-main = do
-    putStr renderFrame
-    testInputLine <- getLine
-    putStr "tenks"
+main = forever $ do
+    movementString <- getLine
+    let newPoint = updatePoint startingPoint (head movementString) --head is unsafe
+        -- save point state in a FILE tonight!! And also a frame state
+    putStrLn $ renderFrameWithUserBusstop newPoint
