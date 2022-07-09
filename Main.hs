@@ -92,11 +92,13 @@ testShapes = [ -- leading elements have higher priority in rendering
     ensureStreetPP $ StreetPD "TUPIKOVYI TYPIK"  (p 150 3) Right' 20,
     ensureStreetPP $ StreetPD "Бельфегоровская"  (p 50 5)  Up     5,
     --
-    StreetPP "Gayorgyeva"       (p 150 3) (p 120 3),
-    StreetPP "Svobody"          (p 100 5) (p 150 5),
-    StreetPP "Vo"               (p 120 0) (p 120 5),
-    StreetPP "TUPIKOVYI TYPIK"  (p 150 2) (p 399 2),
-    StreetPP "Бельфегоровская"  (p 171 2) (p 228 2),
+    StreetPP "Gayorgyeva"       (p 150  3) (p 120  3),
+    StreetPP "Svobody"          (p 100  5) (p 150  5),
+    StreetPP "Vo"               (p 120  0) (p 120  5),
+    StreetPP "TUPIKOVYI TYPIK"  (p 150  2) (p 399  2),
+    StreetPP "Бельфегоровская"  (p 171  2) (p 228  2),
+    StreetPP "test"             (p   6  8) (p 103  8),
+    StreetPP "test 2"           (p  72  0) (p  72 13),
     --
     Route 1 (zipWith p [40, 44, 44]        [4, 4, 14]),
     Route 2 (zipWith p [136, 149, 149, 10] [2, 2, 6, 6]),
@@ -202,5 +204,11 @@ testBusstops = concat [
 
 
 --------------------------------------- MAIN -----------------------------------
-renderFrame :: IO ()
-renderFrame = putStr $ frame012 (testShapes, testBusstops)
+renderFrame :: String
+renderFrame = frame012 (testShapes, testBusstops)
+
+main :: IO ()
+main = do
+    putStr renderFrame
+    testInputLine <- getLine
+    putStr "tenks"

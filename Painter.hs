@@ -75,16 +75,16 @@ xy :: IntPoint -> String
 xy (MkIntPoint x y) = "X=" ++ show x ++ ", Y=" ++ show y
 
 leftX :: [IntPoint] -> Int
-leftX = minimum . (map iX)
+leftX = minimum . map iX
 
 rightX :: [IntPoint] -> Int
-rightX = maximum . (map iX)
+rightX = maximum . map iX
 
 upperY :: [IntPoint] -> Int
-upperY = minimum . (map iY)
+upperY = minimum . map iY
 
 lowerY :: [IntPoint] -> Int
-lowerY = maximum . (map iY)
+lowerY = maximum . map iY
 
 --------------------- OTHER TYPES 0.1.1 (Maps and Sets) ------------------------
 --------------- GenColor
@@ -302,10 +302,10 @@ instance Show Busstop where
 
 --------------------------------- CONSTS ---------------------------------------
 screenWidth :: Int
-screenWidth = 180
+screenWidth = 160
 
 screenHeight :: Int
-screenHeight = 20
+screenHeight = 40
 
 screenSize :: (Int, Int)
 screenSize = (screenWidth, screenHeight)
@@ -539,13 +539,13 @@ pixelsFromBusstop (Deadend _ p) = [MkGenPixel p $ lookupColor "deadend"]
 pixelsFromBusstop (Extra _ p) = [MkGenPixel p $ lookupColor "extra busstop"]
 
 -------frame 012 pipeline
--- DUPLICATION REMOVAL NEEDS A FIX
 dumpPixels :: ([Shape], [Busstop]) -> [GenPixel Char]
 --dumpPixels (shapes, busstops) = concatMap concatMap [ --YEEEEEEEEEEEEESS!!!
-dumpPixels (shapes, busstops) =
-    backgroundPxs
-    ++ concatMap pixelsFromBusstop busstops
+dumpPixels (shapes, busstops) = 
+    -- Order in concat matters! It lays stops over shapes over background
+    backgroundPxs 
     ++ concatMap pixelsFromShape shapes
+    ++ concatMap pixelsFromBusstop busstops
 
 -- |Map.fromList should also remove duplicates
 frameMapFromPixels :: [GenPixel Char] -> Frame Char
