@@ -3,10 +3,9 @@ module Painter
 , GenColor (MkGenColor)
 , GenPixel (MkGenPixel)
 , Frame
-, Direction (NoDirection, Up, Down, Left', Right')
-, Shape (EmptyShape, Building, StreetPD, StreetPP, pt1, pt2, Route)
--- StreetPD deprecated after 0.1.2
+, Shape (EmptyShape, Building, StreetPP, pt1, pt2, Route)
 , Busstop (Intersection, Deadend, Extra) -- for advanced routes
+, FrameContents
 , ensureStreetPP
 , streetPDP2
 , streetPPLen
@@ -15,10 +14,7 @@ module Painter
 , isStreet
 , streetRequiredError
 , frame012
-, paint -- deprecated
-, Point (MakePoint) -- deprecated
-, Color (MakeColor) -- deprecated
-, Pixel (MakePixel) -- deprecated
+, palette
 ) where
 
 import Data.List ( 
@@ -298,7 +294,7 @@ instance Show Busstop where
         "Place \"Deadend\" of " ++ name st ++ " st. at " ++ xy pt
     show (Extra st pt) = 
         "Place \"ExtraBusstop\" on a " ++ name st ++ " st. at " ++ xy pt
-
+        
 
 --------------------------------- CONSTS ---------------------------------------
 screenWidth :: Int
@@ -327,7 +323,8 @@ palette = Map.fromList [
     ("deadend",          c '~'),
     ("extra busstop",    c '*'),
     ("route vertical",   c '|'), -- for advanced routes maybe
-    ("route horizontal", c '-')  -- for advanced routes maybe
+    ("route horizontal", c '-'), -- for advanced routes maybe
+    ("cursor",           c '■')
     ]
     where c = MkGenColor
 
@@ -539,18 +536,18 @@ pixelsFromBusstop (Deadend _ p) = [MkGenPixel p $ lookupColor "deadend"]
 pixelsFromBusstop (Extra _ p) = [MkGenPixel p $ lookupColor "extra busstop"]
 
 -------frame 012 pipeline
-dumpPixels :: ([Shape], [Busstop]) -> [GenPixel Char]
---dumpPixels (shapes, busstops) = concatMap concatMap [ --YEEEEEEEEEEEEESS!!!
-dumpPixels (shapes, busstops) = 
-    -- Order in concat matters! It lays stops over shapes over background
+dumpPixels :: ([Shape], [Busstop], [GenPixel Char]) -> [GenPixel Char]
+dumpPixels (shapes, busstops, miscPixels) = 
+    -- Order in concat matters!
+        -- first components have lower preсedence in rendering
     backgroundPxs 
     ++ concatMap pixelsFromShape shapes
     ++ concatMap pixelsFromBusstop busstops
+    ++ miscPixels
 
 -- |Map.fromList should also remove duplicates
 frameMapFromPixels :: [GenPixel Char] -> Frame Char
---frameMapFromPixels = Map.fromList toPairs' -- WRONG!
-frameMapFromPixels = Map.fromList . toPairs' -- RIGHT!
+frameMapFromPixels = Map.fromList . toPairs'
 
 cropFrameBounds :: Frame Char -> Frame Char
 cropFrameBounds = Map.fromList . filter inBounds . Map.toList
@@ -563,7 +560,7 @@ cropFrameBounds = Map.fromList . filter inBounds . Map.toList
 -- |Join strings with newline chars. We'll get a multiline string to show
 showFrame :: Frame Char -> String
 showFrame frame = ans
-    where -- IMPERATIVE_DRIVEN DEVELOPMENT BITCH
+    where
         pixelPairs = Map.toList frame
         matrixOfPixelPairs = 
             groupBy (\(p1, _) (p2, _) -> iY p1 == iY p2) pixelPairs
@@ -572,5 +569,5 @@ showFrame frame = ans
         ans = unlines $ map pixelPairsListToLine matrixOfPixelPairs
 
 ---------frame012
-frame012 :: ([Shape], [Busstop]) -> String
+frame012 :: ([Shape], [Busstop], [GenPixel Char]) -> String
 frame012 = showFrame . cropFrameBounds . frameMapFromPixels . dumpPixels

@@ -5,10 +5,9 @@ import Painter
     , GenColor (MkGenColor)
     , GenPixel (MkGenPixel)
     , Frame
-    , Direction (NoDirection, Up, Down, Left', Right') --deprecated
-    , Shape (EmptyShape, Building, StreetPD, StreetPP, Route)
-    -- StreetPD deprecated after 0.1.2
-    , Busstop (Intersection, Deadend, Extra) -- for advanced routes
+    , Shape (EmptyShape, Building, StreetPP, Route)
+    , Busstop (Intersection, Deadend, Extra)
+    , FrameContents
     , ensureStreetPP
     , streetPDP2
     , streetPPLen
@@ -17,7 +16,7 @@ import Painter
     , isStreet
     , streetRequiredError
     , frame012
-    , paint -- deprecated
+    , palette
     )
 
 import Shapes 
@@ -65,8 +64,16 @@ import Data.Char (digitToInt)
     -- other traffic
     -- responsive traffic (traffic jams must occur)
 
+------------------------------- TYPES ------------------------------------------
+type GameState = String
+
+type FrameContents = ([Shape], [Busstop], [GenPixel Char])
+
 
 -------------------------- pure functions for main -----------------------------
+gameStateFileName :: String
+gameStateFileName = "game state.txt"
+
 startingPoint :: IntPoint
 startingPoint = MkIntPoint 60 37
 
@@ -78,12 +85,19 @@ updatePoint pt char
     | char ==  's' = MkIntPoint (iX pt) (iY pt + 1)
     | otherwise = error $ "Wrong char for the movement direction." ++ [char]
 
-renderFrame :: String
-renderFrame = frame012 (testShapes, testBusstops)
-
-renderFrameWithUserBusstop :: IntPoint -> String
-renderFrameWithUserBusstop intPoint =
+formFrameWithUserBusstop :: IntPoint -> String
+formFrameWithUserBusstop intPoint =
     frame012 (testShapes, testBusstops ++ [Extra EmptyShape intPoint])
+
+formFrame :: String
+formFrame = frame012 (testShapes, testBusstops, [])
+
+-- |just a GameState parser
+getFrameContents :: GameState -> FrameContents
+getFrameContents = undefined
+
+updateGameState :: GameState -> String -> GameState
+updateGameState prevGameState userActionString = undefined
 
 
 ------------------------- impure functions for main ----------------------------
@@ -94,8 +108,62 @@ putBusstops = forever $ do
     putStr "type Y value: "
     y <- getLine
     putStrLn $ "x=" ++ x ++ ", y=" ++ y
-    putStrLn $ renderFrameWithUserBusstop $ MkIntPoint (read x :: Int) (read y :: Int)
+    putStrLn $ formFrameWithUserBusstop (
+        MkIntPoint (read x :: Int) (read y :: Int)
+        )
     return ()
+
+-- TEST THIS GOOD PRACTICE
+--usingTempFile :: IO ()
+--usingTempFile = undefined
+
+saveGameIntoAFile :: GameState -> IO ()
+saveGameIntoAFile = writeFile gameStateFileName --part. app.
+
+uglyLoadGameFromAFile :: IO GameState
+uglyLoadGameFromAFile = do
+    handle <- openFile gameStateFileName readMode 
+    contents <- hGetContents handle --unwrap IO String into String
+    hClose handle
+    return contents --wrap String to IO String
+
+loadGameFromAFile :: IO String
+loadGameFromAFile = readFile gameStateFileName
+    
+renderFrame :: FrameContents -> IO ()
+renderFrame fContents = putStrLn $ frame012 fContents
+
+-- |Load GameState (GameState is just a String)
+-- |Render Frame with FrameContents encoded in a GameState
+-- |get user input
+-- |update GameState accordingly to user input
+-- |save new gameState
+singleStageGame :: IO ()
+singleStageGame = do
+    gameState <- loadGameFromAFile
+    () <- renderFrame $ getFrameContents gameState
+    userActionLine <- getLine
+    let newGameState = processUserAction userAction gameState
+    () <- saveGameIntoAFile newGameState
+
+-- |if user input is not " ", calls itself to do next stage of the game
+-- |and when user input is " ", returns the last GameState
+gameStageWithoutJerkingAFile :: GameState -> IO GameState
+gameStageWithoutJerkingAFile gameState = do
+    () <- renderFrame $ getFrameContents gameState
+    userActionLine <- getLine
+    if userActionLine == " "
+        then do
+            let newGameState = updateGameState userAction gameState 
+            gameStageWithoutJerkingAFile newGameState
+    else return gameState
+
+infiniteStagesGame :: IO ()
+infiniteStagesGame = do
+    initialGameState <- loadGameFromAFile
+    lastGameState <- gameStageWithoutJerkingAFile initialGameState --looped reqursively
+    -- when " " unput occured, reqursion ended and we're making an autosave
+    saveGameIntoAFile lastGameState
 
 
 --------------------------------- MAIN -----------------------------------------
@@ -104,4 +172,4 @@ main = forever $ do
     movementString <- getLine
     let newPoint = updatePoint startingPoint (head movementString) --head is unsafe
         -- save point state in a FILE tonight!! And also a frame state
-    putStrLn $ renderFrameWithUserBusstop newPoint
+    putStrLn $ formFrameWithUserBusstop newPoint
