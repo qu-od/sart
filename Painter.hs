@@ -1,10 +1,10 @@
 module Painter
-( IntPoint (MkIntPoint)
+( IntPoint (MkIntPoint, iX, iY)
 , GenColor (MkGenColor)
 , GenPixel (MkGenPixel)
 , Frame
 , Direction (NoDirection, Up, Down, Left', Right')
-, Shape (EmptyShape, Building, StreetPD, StreetPP, Route)
+, Shape (EmptyShape, Building, StreetPD, StreetPP, pt1, pt2, Route)
 -- StreetPD deprecated after 0.1.2
 , Busstop (Intersection, Deadend, Extra) -- for advanced routes
 , ensureStreetPP
@@ -154,12 +154,12 @@ data Shape = -- GENERALIZE ALL THOSE WITH A BOX AND A POLYLINE
     EmptyShape 
     | Building {
         name :: String,
-        pt1 :: IntPoint,
-        pt2 :: IntPoint
+        ulp :: IntPoint, -- upper left point
+        lrp :: IntPoint -- lower right point
         }
     | StreetPD { -- DEPRECATED after 0.1.2
         name :: String,
-        pt :: IntPoint,
+        pt0 :: IntPoint,
         dir :: Direction,
         len :: Int
         }
