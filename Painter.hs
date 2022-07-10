@@ -1,11 +1,11 @@
 module Painter
-( IntPoint (MkIntPoint, iX, iY)
+( Entry (entry)
+, IntPoint (MkIntPoint, iX, iY)
 , GenColor (MkGenColor)
 , GenPixel (MkGenPixel)
 , Frame
 , Shape (EmptyShape, Building, StreetPP, pt1, pt2, Route)
 , Busstop (Intersection, Deadend, Extra) -- for advanced routes
-, FrameContents
 , ensureStreetPP
 , streetPDP2
 , streetPPLen
@@ -27,6 +27,17 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Function ( on )
 import Data.Maybe (fromMaybe)
+
+
+---------------------------- TYPECLASSES ---------------------------------------
+class Entry a where
+    entry :: a -> String
+
+instance Entry Int where
+    entry n = show n
+
+instance (Entry a) => Entry [a] where
+    entry list = concatMap entry list
 
 --------------- OLD TYPES (deprecated since 0.0.1) -----------------------------
 data Point = MakePoint {getX :: Int, getY :: Int} deriving (Show, Eq, Ord)
@@ -66,6 +77,9 @@ instance Show IntPoint where
 --instance Read IntPoint where
     -- PARSER MODULE NEEDED
 
+instance Entry IntPoint where
+    entry (MkIntPoint x y) = concat ["(", show x, ", ", show y, ")"]
+
 -- shorter string for a IntPoint
 xy :: IntPoint -> String
 xy (MkIntPoint x y) = "X=" ++ show x ++ ", Y=" ++ show y
@@ -81,6 +95,7 @@ upperY = minimum . map iY
 
 lowerY :: [IntPoint] -> Int
 lowerY = maximum . map iY
+
 
 --------------------- OTHER TYPES 0.1.1 (Maps and Sets) ------------------------
 --------------- GenColor
@@ -110,6 +125,16 @@ gPx (MkGenPixel pt color) = xy pt ++ show color
 
 toPairs' :: [GenPixel Char] -> [(IntPoint, GenColor Char)]
 toPairs' pixels = [(p, color) | (MkGenPixel p color) <- pixels]
+
+instance (Show c) => Entry (GenPixel c) where
+    -- constraint on a added because we'll be applying show
+        -- to color a in a GenPixel a
+    entry (MkGenPixel p color) = 
+        '\n' : unlines [
+            "--- PIXEL ---"
+            , "P=" ++ entry p
+            , "COLOR=" ++ show color
+            ]
 
 -------------- Frame
 type Frame a = Map.Map IntPoint (GenColor a)
@@ -266,6 +291,27 @@ isStreet _ = False
 streetRequiredError :: a
 streetRequiredError = error "There was a Shape... But there was no STREET!"
 
+-- NEED TESTING
+instance Entry Shape where
+    entry (Building name p1 p2) = '\n' : unlines [
+        "--- BUILDING ---"
+        , "NAME=" ++ name --or show name?
+        , "P1=" ++ entry p1 
+        , "P2=" ++ entry p2
+        ]
+    entry (StreetPP name p1 p2) = '\n' : unlines [
+        "--- STREET ---"
+        , "NAME=" ++ name --or show name?
+        , "P1=" ++ entry p1 
+        , "P2=" ++ entry p2
+        ]
+    entry (Route number pts) = '\n' : unlines [
+        "--- ROUTE ---"
+        , "NUMBER=" ++ show number --or show name?
+        , concatMap ((' ':) . entry) pts
+        ]
+    entry _ = error "Unexpected Shape value constructor"
+
 -------------- Busstop
 data Busstop =
     -- record syntax DISCOURAGED when multiple value constructors are used
@@ -294,6 +340,25 @@ instance Show Busstop where
         "Place \"Deadend\" of " ++ name st ++ " st. at " ++ xy pt
     show (Extra st pt) = 
         "Place \"ExtraBusstop\" on a " ++ name st ++ " st. at " ++ xy pt
+
+-- NEED TESTING
+instance Entry Busstop where
+    entry (Intersection st1 st2 pt) = '\n' : unlines [
+        "--- INTERSECTION ---"
+        , "STREET1=" ++ name st1 --id would be better but streets don't have ones
+        , "STREET2=" ++ name st2 
+        , "P=" ++ entry pt
+        ]
+    entry (Deadend st pt) = '\n' : unlines [
+        "--- DEADEND ---"
+        , "STREET=" ++ name st --or show name?
+        , "P=" ++ entry pt
+        ]
+    entry (Extra st pt) = '\n' : unlines [
+        "--- EXTRA ---"
+        , "STREET=" ++ name st --or show name?
+        , "P=" ++ entry pt
+        ]
         
 
 --------------------------------- CONSTS ---------------------------------------
