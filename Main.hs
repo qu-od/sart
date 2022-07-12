@@ -17,12 +17,14 @@ import Painter
     , streetRequiredError
     , frame012
     , palette
+    , entryPrefix
     )
 
-import Shapes 
+import Shapes
     ( testShapes
     , testBusstops
     , testMiscPixels
+    , testPoints
     )
 
 import Control.Monad 
@@ -33,13 +35,15 @@ import Control.Monad
     , forever
     )
 
-import Data.Char (digitToInt)
-
+import Data.List (groupBy, isPrefixOf, isSuffixOf)
+import qualified Data.Map as Map
 import System.IO (openFile, hGetContents, hClose, IOMode(ReadMode))
+import Data.Maybe (fromMaybe)
 
 --import GHC.Stack (HasCallStack)
 
 ------------------------------ META --------------------------------------------
+-- use functors, applicatives and monads (Maybe, List and IOs)
 -- DON'T YOU DARE TO OVEROPTIMIZE! IT WORKS? IF YES - MOVE ON.
 -- SART WILL BE DONE IN THIS WEEK NO MATTER HOW FAR WE'LL GO 
 
@@ -63,24 +67,29 @@ import System.IO (openFile, hGetContents, hClose, IOMode(ReadMode))
     -- routes (0.1.6)
 -- automatic city generation (0.2)
 -- advanced routes
-    -- render in parallel to the streets and to each other (0.2.1)
-    -- bind them to street grid (0.2.2)
+    -- bind them to street grid (0.2.1)
+    -- render in parallel to the streets and to each other (0.2.2)
     -- autogenerate route from point A to point B (0.2.3)
 -- animate (0.3....)
     -- busses traffic
     -- other traffic
     -- responsive traffic (traffic jams must occur)
+--ENOUGH.
 
 ------------------------------- TYPES ------------------------------------------
-type GameState = String
+type Line = String
+type Gewt = [Line] -- Glued Entries Without Titles (for game save parser)
+
+type InputLine = String
+
+type GameStateString = String --contains entries of FrameContents' and GameMeta's elements
 
 type FrameContents = ([Shape], [Busstop], [GenPixel Char])
-type GameMeta = (CursorPoint, BufferedPoints, Stage)
+type GameMeta = (CursorPoint, [BufferedPoint], StageNum)
 
 type CursorPoint = IntPoint
-type BufferedPoints = [IntPoint]
-type Stage = Int
-
+type BufferedPoint = IntPoint
+type StageNum = Int
 
 
 ------------------------------ test functions ----------------------------------
@@ -91,7 +100,7 @@ type Stage = Int
 --formFrame :: String
 --formFrame = frame012 (testShapes, testBusstops, [])
 
---uglyLoadGameFromAFile :: IO GameState --DEPRECATED
+--uglyLoadGameFromAFile :: IO GameStateString --DEPRECATED
 --uglyLoadGameFromAFile = do
     --handle <- openFile gameStateFileName ReadMode 
     --contents <- hGetContents handle --unwrap IO String into String
@@ -100,7 +109,7 @@ type Stage = Int
 
 --main = forever $ do
     --movementString <- getLine
-    --let newPoint = updatePoint startingPoint (head movementString) --head is unsafe
+    --let newPoint = updateCursor startingPoint (head movementString) --head is unsafe
         -- save point state in a FILE tonight!! And also a frame state
     --putStrLn $ formFrameWithUserBusstop newPoint
 
@@ -109,15 +118,15 @@ gameStateFileName :: String
 gameStateFileName = "game state.txt"
 
 startingPoint :: IntPoint
-startingPoint = MkIntPoint 60 37
+startingPoint = MkIntPoint 0 0
 
-updatePoint :: IntPoint -> Char -> IntPoint
-updatePoint pt char
-    | char ==  'a' = MkIntPoint (iX pt - 1) (iY pt)
-    | char ==  'd' = MkIntPoint (iX pt + 1) (iY pt)
-    | char ==  'w' = MkIntPoint (iX pt) (iY pt - 1)
-    | char ==  's' = MkIntPoint (iX pt) (iY pt + 1)
-    | otherwise = error $ "Wrong char for the movement direction." ++ [char]
+updateCursor :: CursorPoint -> InputLine -> CursorPoint
+updateCursor (MkIntPoint x y) iLine
+    | iLine == "a" = MkIntPoint (x - 1) y
+    | iLine == "d" = MkIntPoint (x + 1) y
+    | iLine == "w" = MkIntPoint x (y - 1)
+    | iLine == "s" = MkIntPoint x (y + 1)
+    | otherwise = error $ "Wrong line for the movement direction." ++ iLine
 
 testFrameContents :: FrameContents
 testFrameContents = (
@@ -126,28 +135,125 @@ testFrameContents = (
     , [MkGenPixel (MkIntPoint 0 0) (MkGenColor '5')]
     )
 
+makeTestGameState :: GameStateString
+makeTestGameState = makeGameState testFrameContents testGameMeta
+    where 
+        testFrameContents = (testShapes, testBusstops, testMiscPixels)
+        testGameMeta = (testCursorPoint, testBufferedPoints, testSatgeNum)
+        testCursorPoint = startingPoint 
+        testBufferedPoints = testPoints
+        testSatgeNum = 0
 
-testGameState :: FrameContents -> GameMeta -> GameState
-testGameState (shapes, busstops, pixels) = concat [
-    -- unlines is excessive cuz entries
-    -- are already multiline and also with '\n' at head
-    map entry shapes,
-    map entry busstops,
-    map entry pixels,
-    "\n--- CURSOR ---\n", entry startingPoint,
-    "\n--- BUFFERED POINTS ---\n", entry [],
-    "\n--- STAGE ---\n", entry (0 :: Int)
-    ]
+-- |USE BINARY DATA STRUCTURE FOR GameState INSTEAD OF PLANE String LATER
+makeGameState :: FrameContents -> GameMeta -> GameStateString
+makeGameState (shapes, busstops, pixels) (cursorPt, bufferedPts, stageNum) = 
+    concat [
+        -- unlines is excessive cuz entries
+        -- are already multiline and also with '\n' at head
+        concatMap entry shapes,
+        concatMap entry busstops,
+        concatMap entry pixels,
+        "\n" ++ entryPrefix ++ "CURSOR POINT\nP=", entry cursorPt, "\n",
+        "\n" ++ entryPrefix ++ "BUFFERED POINTS\nPTS=", entry bufferedPts, "\n",
+        "\n" ++ entryPrefix ++ "STAGE NUM\nN=", entry stageNum, "\n"
+        ]
 
--- |just a GameState PARSER
--- |String in a returned pair contains other game info other than shape
--- |function will be updated for sure
-parseGameState :: GameState -> (FrameContents, GameMeta)
-parseGameState gameState = undefined
+-- |just a GameStateString PARSER (inverse to makeGameState)
+-- |algorithm:
+-- |1. Obtain a list of entries by splitting GameStateString with "==|>"
+-- |2. Pattern match every entry and read it to a value of a correspondent type
+parseGameState :: GameStateString -> (FrameContents, GameMeta)
+parseGameState gameState = (
+    (shapes, busstops, pixels),
+    (cursor, buffer, stage)
+    )
+    where
+        entries :: [[Line]]
+        entries = 
+            groupBy (\_ line -> not (entryPrefix `isPrefixOf` line)) . lines $ gameState
 
-getFrameContents :: GameState -> FrameContents
-getFrameContents gameState = 
-    (\(frameContents, _) -> frameContents) $ parseGameState gameState
+        singleOutTitleLineFromEntry :: [Line] -> (Line, [Line])
+        singleOutTitleLineFromEntry (headLine:restOfLines)
+            | "BUILDING"        `isSuffixOf` headLine = ("BUILDING"        , restOfLines)
+            | "STREET"          `isSuffixOf` headLine = ("STREET"          , restOfLines)
+            | "ROUTE"           `isSuffixOf` headLine = ("ROUTE"           , restOfLines)
+            | "INTERSECTION"    `isSuffixOf` headLine = ("INTERSECTION"    , restOfLines)
+            | "DEADEND"         `isSuffixOf` headLine = ("DEADEND"         , restOfLines)
+            | "EXTRA"           `isSuffixOf` headLine = ("EXTRA"           , restOfLines)
+            | "PIXEL"           `isSuffixOf` headLine = ("PIXEL"           , restOfLines)
+            | "CURSOR POINT"    `isSuffixOf` headLine = ("CURSOR POINT"    , restOfLines)
+            | "BUFFERED POINTS" `isSuffixOf` headLine = ("BUFFERED POINTS" , restOfLines)
+            | "STAGE NUM"       `isSuffixOf` headLine = ("STAGE NUM"       , restOfLines)
+            | otherwise = error "Unexpected entry headLine"
+        singleOutTitleLineFromEntryLines [] = error "No Entries found!"
+
+        -- mapped not by "type name" exactly but by value constructor name
+        -- :: Map.Map String [String] or Map. titleLine restOfEntryLines
+        concatenatedCommonTypeEntriesMappedByTypeName :: Map.Map Line [Line]
+        concatenatedCommonTypeEntriesMappedByTypeName = 
+            Map.fromListWith (++) (map singleOutTitleLineFromEntry entries)
+
+        -- gewt means Glued Entries Without Titles
+        getGewt :: String -> Gewt
+        getGewt title = fromMaybe (error "No such key in entries map")
+            (Map.lookup title concatenatedCommonTypeEntriesMappedByTypeName)
+
+        fieldValue :: String -> String
+        fieldValue = tail . dropWhile (/= '=')
+        fieldName :: String -> String
+        fieldName = takeWhile (/= '=')
+
+        readBuildings :: Gewt -> [Shape]
+        readBuildings gewt = []
+        readStreets :: Gewt -> [Shape]
+        readStreets gewt = []
+        readRoutes :: Gewt -> [Shape]
+        readRoutes gewt = []
+
+        readIntersections :: Gewt -> [Busstop]
+        readIntersections gewt = []
+        readDeadends :: Gewt -> [Busstop]
+        readDeadends gewt = []
+        readExtraBusstops :: Gewt -> [Busstop]
+        readExtraBusstops gewt = []
+
+        readPixels :: Gewt -> [GenPixel Char]
+        readPixels gewt = []
+
+        readCursor :: Gewt -> CursorPoint
+        readCursor gewt = undefined
+        readBuffer :: Gewt -> [BufferedPoint]
+        readBuffer gewt = undefined
+        readStage :: Gewt -> StageNum
+        readStage gewt = undefined
+
+        shapes :: [Shape]
+        shapes = 
+            readBuildings (getGewt "BUILDING")
+            ++ readStreets (getGewt "STREET")
+            ++ readRoutes (getGewt "ROUTE")
+
+        busstops :: [Busstop]
+        busstops = 
+            readIntersections (getGewt "INTERSECTION")
+            ++ readDeadends (getGewt "DEADEND")
+            ++ readExtraBusstops (getGewt "EXTRA")
+
+        pixels :: [GenPixel Char]
+        pixels = readPixels (getGewt "PIXEL")
+
+        cursor :: CursorPoint
+        cursor = readCursor (getGewt "CURSOR POINT")
+
+        buffer :: [BufferedPoint]
+        buffer = readBuffer (getGewt "BUFFERED POINTS")
+
+        stage :: StageNum
+        stage = readStage (getGewt "STAGE NUM")
+
+
+getFrameContents :: GameStateString -> FrameContents
+getFrameContents gameState = fst $ parseGameState gameState
 
 -- |How the game state could be updated? (" " just quits the game completely)
 -- |1. cursor moved with 'w' 'a' 's' 'd' inputs (cursor coords updated)
@@ -156,8 +262,8 @@ getFrameContents gameState =
 -- |4. route point created with 'r' (points buffered one after another)
 -- |5. route last point created with 'l' (route built)
 -- -- |if inputs are (not bb) or (not tt) or (not r...rl) just flush the buffer
-updateGameState :: GameState -> String -> GameState
-updateGameState prevGameState inputLine = case inputLine of 
+updateGameState :: GameStateString -> InputLine -> GameStateString
+updateGameState prevGameStateString inputLine = case inputLine of 
     "w" -> undefined
     "a" -> undefined
     "s" -> undefined
@@ -167,34 +273,28 @@ updateGameState prevGameState inputLine = case inputLine of
     "r" -> undefined
     "l" -> undefined
     _ -> error "Unexpected input line"
-    where 
-        i :: String
-        i = inputLine
-        gameStateLines :: [String]
-        gameStateLines = lines prevGameState
-        cursorLine :: String
-        cursorLine = 
+        
 
 
 ------------------------- impure functions for main ----------------------------
 makeFileWithInitialGameState :: IO ()
 makeFileWithInitialGameState = do 
-    saveGameIntoAFile testGameState
+    saveGameIntoAFile makeTestGameState
 
 -- TEST THIS GOOD PRACTICE
 --usingTempFile :: IO ()
 --usingTempFile = 
 
-saveGameIntoAFile :: GameState -> IO ()
+saveGameIntoAFile :: GameStateString -> IO ()
 saveGameIntoAFile = writeFile gameStateFileName --part. app.
 
-loadGameFromAFile :: IO GameState
+loadGameFromAFile :: IO GameStateString
 loadGameFromAFile = readFile gameStateFileName
     
 renderFrame :: FrameContents -> IO ()
 renderFrame fContents = putStrLn $ frame012 fContents
 
--- |Load GameState (GameState is just a String)
+-- |Load GameStateString (GameStateString is just a String)
 -- |Render Frame with FrameContents encoded in a GameState
 -- |get user input
 -- |update GameState accordingly to user input
@@ -209,7 +309,7 @@ singleStageGame = do
 
 -- |if user input is not " ", calls itself to do next stage of the game
 -- |and when user input is " ", returns the last GameState
-recursiveLoopOfGameStagesWithoutJerkingAFile :: GameState -> IO GameState
+recursiveLoopOfGameStagesWithoutJerkingAFile :: GameStateString -> IO GameStateString
 recursiveLoopOfGameStagesWithoutJerkingAFile gameState = do
     () <- renderFrame $ getFrameContents gameState
     userActionLine <- getLine

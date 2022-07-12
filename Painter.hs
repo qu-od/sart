@@ -15,10 +15,11 @@ module Painter
 , streetRequiredError
 , frame012
 , palette
+, entryPrefix
 ) where
 
 import Data.List ( 
-    nub, sort, reverse, groupBy
+    nub, sort, reverse, groupBy, intersperse, intercalate
     )
 import Data.Char (
     isUpper, isDigit, isLower
@@ -37,7 +38,12 @@ instance Entry Int where
     entry n = show n
 
 instance (Entry a) => Entry [a] where
-    entry list = concatMap entry list
+    entry list = '[' : intercalate "," (map entry list) ++ "]"
+    --entry list = concatMap entry list
+
+entryPrefix :: String --prefix of every entry in a file parametrized
+entryPrefix = "==|> "
+
 
 --------------- OLD TYPES (deprecated since 0.0.1) -----------------------------
 data Point = MakePoint {getX :: Int, getY :: Int} deriving (Show, Eq, Ord)
@@ -131,7 +137,7 @@ instance (Show c) => Entry (GenPixel c) where
         -- to color a in a GenPixel a
     entry (MkGenPixel p color) = 
         '\n' : unlines [
-            "--- PIXEL ---"
+            entryPrefix ++ "PIXEL"
             , "P=" ++ entry p
             , "COLOR=" ++ show color
             ]
@@ -294,21 +300,21 @@ streetRequiredError = error "There was a Shape... But there was no STREET!"
 -- NEED TESTING
 instance Entry Shape where
     entry (Building name p1 p2) = '\n' : unlines [
-        "--- BUILDING ---"
+        entryPrefix ++ "BUILDING"
         , "NAME=" ++ name --or show name?
         , "P1=" ++ entry p1 
         , "P2=" ++ entry p2
         ]
     entry (StreetPP name p1 p2) = '\n' : unlines [
-        "--- STREET ---"
+        entryPrefix ++ "STREET"
         , "NAME=" ++ name --or show name?
         , "P1=" ++ entry p1 
         , "P2=" ++ entry p2
         ]
     entry (Route number pts) = '\n' : unlines [
-        "--- ROUTE ---"
+        entryPrefix ++ "ROUTE"
         , "NUMBER=" ++ show number --or show name?
-        , concatMap ((' ':) . entry) pts
+        , "PTS=" ++ concatMap ((' ':) . entry) pts
         ]
     entry _ = error "Unexpected Shape value constructor"
 
@@ -344,18 +350,18 @@ instance Show Busstop where
 -- NEED TESTING
 instance Entry Busstop where
     entry (Intersection st1 st2 pt) = '\n' : unlines [
-        "--- INTERSECTION ---"
+        entryPrefix ++ "INTERSECTION"
         , "STREET1=" ++ name st1 --id would be better but streets don't have ones
         , "STREET2=" ++ name st2 
         , "P=" ++ entry pt
         ]
     entry (Deadend st pt) = '\n' : unlines [
-        "--- DEADEND ---"
+        entryPrefix ++ "DEADEND"
         , "STREET=" ++ name st --or show name?
         , "P=" ++ entry pt
         ]
     entry (Extra st pt) = '\n' : unlines [
-        "--- EXTRA ---"
+        entryPrefix ++ "EXTRA"
         , "STREET=" ++ name st --or show name?
         , "P=" ++ entry pt
         ]

@@ -1,10 +1,11 @@
 {-# LANGUAGE ViewPatterns #-}
 
-module Shapes -- Module also includes makinng Busstops and "other Pixels"
+module Shapes  -- Module also includes makinng Busstops and "other Pixels"
 ( testShapes
 , testBusstops
 , testMiscPixels
-    ) where
+, testPoints
+) where
 
 import Painter
     ( IntPoint (MkIntPoint, iX, iY) --test getters import
@@ -25,6 +26,14 @@ import Painter
         , Extra)
     )
 
+
+
+
+
+
+
+
+----------------------------- TEST DATA ----------------------------------------
 testPoint :: IntPoint
 testPoint = MkIntPoint 2 3
 
@@ -33,9 +42,6 @@ testCharGenColor = MkGenColor '$'
 
 testGenPixel :: GenPixel Char
 testGenPixel = MkGenPixel testPoint testCharGenColor
-
---anotherTestGenPixel :: GenPixel a -- What's your problem?
---anotherTestGenPixel = MkGenPixel (MkIntPoint 3 4) MkGenColor '-'
 
 p :: Int -> Int -> IntPoint
 p = MkIntPoint
@@ -74,6 +80,9 @@ testShapes = [ -- leading elements have higher priority in rendering
     Route 3 (zipWith p [10, 10, 134, 134]  [6, 4, 4, 1])
     ]
 
+
+
+----------------------------- BUSSTOPS GENERATION ------------------------------
 -- USE SETS THERE (to dumb too slow, so I won't)
 -- |Filter out vertical lines
 -- |Filter out horizontal lines
