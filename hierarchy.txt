@@ -1,7 +1,7 @@
-Main<---|
-^	|
-|	|
-Shapes  |
-^	|
-|	|
-Painter-|
+Main <----------|<---------- Saves
+^	            |
+|	            |
+Painter         |
+^           	|
+|	            |
+Shapes ---------|
