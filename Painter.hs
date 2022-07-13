@@ -15,6 +15,7 @@ module Painter
 , streetRequiredError
 , frame012
 , palette
+, lookupColor
 , entryPrefix
 ) where
 
@@ -56,7 +57,7 @@ data Pixel = MakePixel {coords :: Point, color :: Color} deriving (Show)
 
 ----------------------------- IntPoint type 0.1.1 ------------------------------
 -- type needs testing
-data IntPoint = MkIntPoint {iX :: Int, iY :: Int} deriving (Read)
+data IntPoint = MkIntPoint {iX :: Int, iY :: Int}
 
 instance Eq IntPoint where 
     MkIntPoint x1 y1 == MkIntPoint x2 y2 = (x1 == x2) && (y1 == y2)
@@ -135,11 +136,11 @@ toPairs' pixels = [(p, color) | (MkGenPixel p color) <- pixels]
 instance (Show c) => Entry (GenPixel c) where
     -- constraint on a added because we'll be applying show
         -- to color a in a GenPixel a
-    entry (MkGenPixel p color) = 
+    entry (MkGenPixel p (MkGenColor c)) = 
         '\n' : unlines [
             entryPrefix ++ "PIXEL"
             , "P=" ++ entry p
-            , "COLOR=" ++ show color
+            , "CHAR=" ++ show c
             ]
 
 -------------- Frame
@@ -178,7 +179,7 @@ instance Show Direction where
 data Shape = -- GENERALIZE ALL THOSE WITH A BOX AND A POLYLINE
         -- record syntax DISCOURAGED when multiple value constructors are used
         -- ADDING DIFFERENT CONSTRUCTORS FOR A STREET WAS A MISTAKE))
-    EmptyShape 
+    EmptyShape
     | Building {
         name :: String,
         ulp :: IntPoint, -- upper left point
@@ -314,7 +315,7 @@ instance Entry Shape where
     entry (Route number pts) = '\n' : unlines [
         entryPrefix ++ "ROUTE"
         , "NUMBER=" ++ show number --or show name?
-        , "PTS=" ++ concatMap ((' ':) . entry) pts
+        , "PTS=[" ++ intercalate "," (map entry pts) ++ "]"
         ]
     entry _ = error "Unexpected Shape value constructor"
 
