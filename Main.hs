@@ -161,7 +161,8 @@ makeGameState (shapes, busstops, pixels) (cursorPt, bufferedPts, stageNum) =
 -- |just a GameStateString PARSER (inverse to makeGameState)
 -- |algorithm:
 -- |1. Obtain a list of entries by splitting GameStateString with "==|>"
--- |2. Pattern match every entry and read it to a value of a correspondent type
+-- |2. other stuff...
+-- |function uses unsafe1 head
 parseGameState :: GameStateString -> (FrameContents, GameMeta)
 parseGameState gameState = (
     (shapes, busstops, pixels),
@@ -198,35 +199,50 @@ parseGameState gameState = (
         getGewt title = fromMaybe (error "No such key in entries map")
             (Map.lookup title concatenatedCommonTypeEntriesMappedByTypeName)
 
-        fieldValue :: String -> String
-        fieldValue = tail . dropWhile (/= '=')
-        fieldName :: String -> String
-        fieldName = takeWhile (/= '=')
+        value :: String -> String --field value in line of Gewt
+        value = tail . dropWhile (/= '=') 
+        name :: String -> String --field name in line of Gewt
+        name = takeWhile (/= '=')
 
+        -------------------------------
         readBuildings :: Gewt -> [Shape]
         readBuildings gewt = []
+
         readStreets :: Gewt -> [Shape]
         readStreets gewt = []
+
         readRoutes :: Gewt -> [Shape]
         readRoutes gewt = []
 
+        -------------------------------
         readIntersections :: Gewt -> [Busstop]
         readIntersections gewt = []
+
         readDeadends :: Gewt -> [Busstop]
         readDeadends gewt = []
+
         readExtraBusstops :: Gewt -> [Busstop]
         readExtraBusstops gewt = []
 
+        ---------------------------
         readPixels :: Gewt -> [GenPixel Char]
         readPixels gewt = []
 
+        -------------------------
         readCursor :: Gewt -> CursorPoint
-        readCursor gewt = undefined
+        readCursor (head -> field) = 
+            let (x, y) = read (value field) :: (Int, Int) 
+            in MkIntPoint x y
+                
         readBuffer :: Gewt -> [BufferedPoint]
-        readBuffer gewt = undefined
-        readStage :: Gewt -> StageNum
-        readStage gewt = undefined
+        readBuffer (head -> field) = 
+            let coordPairs = read (value field) :: [(Int, Int)]
+            in map (uncurry MkIntPoint) coordPairs
 
+        readStage :: Gewt -> StageNum
+        readStage (head -> field) = read (value field) :: Int
+
+        ------------------------------
         shapes :: [Shape]
         shapes = 
             readBuildings (getGewt "BUILDING")
@@ -263,17 +279,17 @@ getFrameContents gameState = fst $ parseGameState gameState
 -- |5. route last point created with 'l' (route built)
 -- -- |if inputs are (not bb) or (not tt) or (not r...rl) just flush the buffer
 updateGameState :: GameStateString -> InputLine -> GameStateString
-updateGameState prevGameStateString inputLine = case inputLine of 
-    "w" -> undefined
-    "a" -> undefined
-    "s" -> undefined
-    "d" -> undefined
-    "b" -> undefined
-    "t" -> undefined
-    "r" -> undefined
-    "l" -> undefined
-    _ -> error "Unexpected input line"
-        
+updateGameState (parseGameState -> ((shapes, stops, pxs), (cursor, buffer, stage))) inputLine
+    = case inputLine of 
+        "w" -> makeGameState (shapes, stops, pxs) (MkIntPoint (iX cursor) (iY cursor - 1), buffer, stage + 1)
+        "a" -> makeGameState (shapes, stops, pxs) (MkIntPoint (iX cursor - 1) (iY cursor), buffer, stage + 1)
+        "s" -> makeGameState (shapes, stops, pxs) (MkIntPoint (iX cursor) (iY cursor + 1), buffer, stage + 1)
+        "d" -> makeGameState (shapes, stops, pxs) (MkIntPoint (iX cursor + 1) (iY cursor), buffer, stage + 1)
+        "b" -> makeGameState (Building ("userInput s" ++ show stage) (buffer !! 0) (buffer !! 1) : shapes, stops, pxs) (cursor, [], stage + 1)
+        "t" -> makeGameState (StreetPP ("userInput s" ++ show stage) (buffer !! 0) (buffer !! 1) : shapes, stops, pxs) (cursor, [], stage + 1)
+        "r" -> makeGameState (shapes, stops, pxs) (cursor, cursor:buffer, stage + 1)
+        "l" -> makeGameState (Route 0 buffer : shapes, stops, pxs) (cursor, [], stage + 1)
+        _ -> error "Unexpected input line"        
 
 
 ------------------------- impure functions for main ----------------------------
@@ -299,13 +315,13 @@ renderFrame fContents = putStrLn $ frame012 fContents
 -- |get user input
 -- |update GameState accordingly to user input
 -- |save new gameState
-singleStageGame :: IO () -- DEPRECATED
-singleStageGame = do
-    gameState <- loadGameFromAFile
-    () <- renderFrame $ getFrameContents gameState
-    userActionLine <- getLine
-    let newGameState = updateGameState userActionLine gameState
-    saveGameIntoAFile newGameState
+--singleStageGame :: IO () -- DEPRECATED
+--singleStageGame = do
+    --gameState <- loadGameFromAFile
+    --() <- renderFrame $ getFrameContents gameState
+    --userActionLine <- getLine
+    --let newGameState = updateGameState gameState userActionLine
+    --saveGameIntoAFile newGameState
 
 -- |if user input is not " ", calls itself to do next stage of the game
 -- |and when user input is " ", returns the last GameState
@@ -313,9 +329,10 @@ recursiveLoopOfGameStagesWithoutJerkingAFile :: GameStateString -> IO GameStateS
 recursiveLoopOfGameStagesWithoutJerkingAFile gameState = do
     () <- renderFrame $ getFrameContents gameState
     userActionLine <- getLine
-    if userActionLine == " "
+    if userActionLine /= " "
         then do
             let newGameState = updateGameState userActionLine gameState 
+            saveGameIntoAFile newGameState --DO FILE SAVE AS A BACKUP JUST IN CASE (TEST)
             recursiveLoopOfGameStagesWithoutJerkingAFile newGameState
         else return gameState
 

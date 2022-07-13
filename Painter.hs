@@ -56,7 +56,7 @@ data Pixel = MakePixel {coords :: Point, color :: Color} deriving (Show)
 
 ----------------------------- IntPoint type 0.1.1 ------------------------------
 -- type needs testing
-data IntPoint = MkIntPoint {iX :: Int, iY :: Int}
+data IntPoint = MkIntPoint {iX :: Int, iY :: Int} deriving (Read)
 
 instance Eq IntPoint where 
     MkIntPoint x1 y1 == MkIntPoint x2 y2 = (x1 == x2) && (y1 == y2)
