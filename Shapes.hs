@@ -1,61 +1,113 @@
 {-# LANGUAGE ViewPatterns #-}
 
-module Shapes  -- Module also includes makinng Busstops and "other Pixels"
-( testShapes
-, testBusstops
-, testMiscPixels
-, testPoints
+module Shapes 
+( Shape (
+    Building, bdName, ulp, lrp,
+    Street, stName, pt1, pt2
+    )
+, testShapes
+, streetLen
+, streetAxis
+, interpolate'
+, isStreet
+, streetRequiredError
 ) where
 
-import Painter
-    ( IntPoint (MkIntPoint, iX, iY) --test getters import
+import Pixels
+    ( IntPoint (MkIntPoint, iX, iY)
     , GenColor (MkGenColor)
     , GenPixel (MkGenPixel)
-    , Shape 
-        ( EmptyShape
-        , Building
-        , StreetPP, pt1, pt2
-        , Route )
-    , ensureStreetPP
-    , streetAxis
-    , interpolate'
-    , isStreet
-    , Busstop 
-        ( Intersection
-        , Deadend
-        , Extra)
-    )
+    , xy
+    , leftX
+    , rightX
+    , upperY
+    , lowerY
+    ) 
 
+---------------------------- SHAPE TYPES ----------------------------------------
+-------------- Direction
+data Direction = --unused for now... (0.1.3)
+      Up
+    | Down
+    | Left'
+    | Right'
+    deriving (Eq)
 
+instance Show Direction where
+    show Up = "Upwards"
+    show Down = "Downwards"
+    show Left' = "to the Left"
+    show Right' = "to the Right"
 
+----------------- Polyline
+-- type Polyline = [IntPoint]
 
+---------------- Shape
+data Shape = -- GENERALIZE ALL THOSE WITH A BOX AND A POLYLINE
+        -- record syntax DISCOURAGED when multiple value constructors are used
+        -- ADDING DIFFERENT CONSTRUCTORS FOR A STREET WAS A MISTAKE))
+    Building {
+        bdName :: String,
+        ulp :: IntPoint, -- upper left point
+        lrp :: IntPoint -- lower right point
+        }
+    | Street {
+        stName :: String,
+        pt1 :: IntPoint,
+        pt2 :: IntPoint
+        }
 
+instance Show Shape where 
+    show (Building name pt1 pt2) = concat [
+        "Building \"", name, "\" between ", xy pt1, "; ", xy pt2
+        ]
+    show (Street name pt1 pt2) = concat [
+        name, "Street from ", xy pt1, "to ", xy pt2
+        ]
 
+streetLen :: Shape -> Int -- bigPP
+streetLen (Street _ (MkIntPoint x1 y1) (MkIntPoint x2 y2))
+    | y1 == y2 = 1 + abs (x2 - x1) -- horizontal
+    | x1 == x2 = 1 + abs (y2 - y1) -- vertical
+    | otherwise = error "Diagonal street occured which is forbidden"
+streetLen _ =
+    error "streetLen function requires Street and not any other Shape"
+
+-- |single-point street case is not handled specifically
+streetAxis :: Shape -> String
+streetAxis (Street _ (MkIntPoint x1 y1) (MkIntPoint x2 y2) )
+    | x1 == x2 = "oY"
+    | y1 == y2 = "oX"
+    | otherwise = error "Unexpected street Direction"
+streetAxis _ = streetRequiredError
+
+-- |that's basically a type "method"
+-- |function doesn't paint buildings' walls into special color
+-- -- |and doesn't render name of a shape
+interpolate' :: Shape -> [IntPoint]
+interpolate' (Building _ pt1 pt2) = [
+    MkIntPoint x y 
+    | x <- [leftX pts .. rightX pts], y <- [upperY pts .. lowerY pts]
+    ]
+    where pts = [pt1, pt2]
+interpolate' st@(Street _ pt1 pt2)
+    | streetAxis st == "oX" = 
+        map (`MkIntPoint` iY pt1) [leftX pts .. rightX pts]
+    | otherwise = map (MkIntPoint (iX pt1)) [upperY pts .. lowerY pts]
+    where pts = [pt1, pt2]
+
+isStreet :: Shape -> Bool
+isStreet Street {} = True
+isStreet _ = False
+
+-- which type need to be used?
+streetRequiredError :: a
+streetRequiredError = error "There was a Shape... But there was no STREET!"
 
 
 ----------------------------- TEST DATA ----------------------------------------
-testPoint :: IntPoint
-testPoint = MkIntPoint 2 3
-
-testCharGenColor :: GenColor Char
-testCharGenColor = MkGenColor '$'
-
-testGenPixel :: GenPixel Char
-testGenPixel = MkGenPixel testPoint testCharGenColor
-
 p :: Int -> Int -> IntPoint
 p = MkIntPoint
-
-testPoints :: [IntPoint]
-testPoints = map (uncurry p) [
-    (136, 2),
-    (149, 2),
-    (149, 6),
-    (10, 6),
-    (10, 4),
-    (134, 4),
-    (134, 1) -- i=6
-    ]
 
 testShapes :: [Shape]
 testShapes = [ -- leading elements have higher priority in rendering
@@ -64,105 +116,15 @@ testShapes = [ -- leading elements have higher priority in rendering
     Building "TEST BUILdinG 68" (p  40  4) (p  60  6),
     Building " в ебенях"        (p  44 14) (p  70 19),
     Building "что-то"           (p  74  4) (p  80  6),
-    StreetPP "foo"              (p 150  5) (p 100  5),
-    StreetPP "Yablochkova"      (p 150  3) (p 170  3),
-    StreetPP "Kosmonavtov"      (p  50  5) (p  50  0),
-    StreetPP "Gayorgyeva"       (p 150  3) (p 120  3),
-    StreetPP "Svobody"          (p 100  5) (p 150  5),
-    StreetPP "Vo"               (p 120  0) (p 120  5),
-    StreetPP "TUPIKOVYI TYPIK"  (p 150  2) (p 399  2),
-    StreetPP "Бельфегоровская"  (p 171  2) (p 228  2),
-    StreetPP "test"             (p   6  8) (p 103  8),
-    StreetPP "test 2"           (p  72  0) (p  72 13),
     --
-    Route 1 (zipWith p [40, 44, 44]        [4, 4, 14]),
-    Route 2 (zipWith p [136, 149, 149, 10] [2, 2, 6, 6]),
-    Route 3 (zipWith p [10, 10, 134, 134]  [6, 4, 4, 1])
+    Street "foo"                (p 150  5) (p 100  5),
+    Street "Yablochkova"        (p 150  3) (p 170  3),
+    Street "Kosmonavtov"        (p  50  5) (p  50  0),
+    Street "Gayorgyeva"         (p 150  3) (p 120  3),
+    Street "Svobody"            (p 100  5) (p 150  5),
+    Street "Vo"                 (p 120  0) (p 120  5),
+    Street "TUPIKOVYI TYPIK"    (p 150  2) (p 399  2),
+    Street "Бельфегоровская"    (p 171  2) (p 228  2),
+    Street "test"               (p   6  8) (p 103  8),
+    Street "test 2"             (p  72  0) (p  72 13)
     ]
-
-
-
------------------------------ BUSSTOPS GENERATION ------------------------------
--- USE SETS THERE (to dumb too slow, so I won't)
--- |Filter out vertical lines
--- |Filter out horizontal lines
--- |For each horizontal line find intersection with
--- |Could be optimized with predicates that'll tell if intersection between
--- -- |two streets is even possible given their endpoints
-intersectionsOfStreets :: [Shape] -> [Busstop]
-intersectionsOfStreets (map ensureStreetPP -> sts) = [ --part. app. of map
-    Intersection stOX stOY (MkIntPoint (iX (pt1 stOY)) (iY (pt1 stOX))) |
-    stOX <- stsOX sts, stOY <- stsOY sts,
-    stOX `shouldIntersect` stOY 
-    ]
-    where
-        stsOX = filter ((== "oX") . streetAxis)
-        stsOY = filter ((== "oY") . streetAxis)
-        xAligned (StreetPP _ st1p1 st1p2) (StreetPP _ st2p1 st2p2) =
-            (iX st1p1 <= iX st2p1) && (iX st2p1 <= iX st1p2)
-        xAligned _ _ = error "StreetPP required"
-        yAligned (StreetPP _ st1p1 st1p2) (StreetPP _ st2p1 st2p2) =
-            (iY st2p1 <= iY st1p1) && (iY st1p1 <= iY st2p2)
-        yAligned _ _ = error "StreetPP required"
-        stX `shouldIntersect` stY = xAligned stX stY && yAligned stX stY
-    
-
--- |should we make it return a pair instead of a list to 
--- -- |highlight the fact that there are 2 deadends?
-deadendsOfStreet :: Shape -> [Busstop]
-deadendsOfStreet st@(StreetPP _ pt1 pt2) = [
-    Deadend st pt1, Deadend st pt2
-    ]
-deadendsOfStreet _ = error "StreetPP required"
-
--- |how extra busstops are added.. (whit papir)
--- |let distance between busstops be D (defaultBusstopDistance :: Int)
--- |then there are D-1 empty street points between them
--- |every deadend and an intersection is a busstop by default
--- -- |and they'll be finded by other functions
--- |busstops are added from the top or from the left
--- -- |(depends on street direction)
--- |and let's be generous not to delete last busstop just before pt2
--- -- |only because distance between them could be less than D
--- |So extra busstops will be having following indices among street points: 
--- -- |Xi=[D, 2*D, 3*D, ..., N*D] where Xi <= streetLen - 2
-defaultBusstopDistance :: Int
-defaultBusstopDistance = 5
-
--- | OLD UGLY VARIANT. DEPRECATED
---extraBusstopsForStreet' :: Shape -> [Busstop] 
---extraBusstopsForStreet' st = 
-    --case st of (StreetPD _ pt dir len) -> extraBusstops $ minEnd p1 (streetPDP2 st)
-               --(StreetPP _ pt1 pt2) -> extraBusstops $ minEnd pt1 pt2
-               --_ -> streetRequiredError
-    --where
-        --minEnd p1 p2 = MkIntPoint (min (iX p1) (iX p2)) (min (iY p1) (iY p2))
-        --d = defaultBusstopDistance
-        --extraBusstops p1 = map (Extra st ) (extraBusstopsPoints p1) --PARTIAL APPLICATION WITH MAP WOWIE
-        --extraBusstopsPoints p1 = if streetAxis st == "oX"  
-                --then -- p1 must be the left end  -- iterating xs
-                    --map (`MkIntPoint` iY p1) (takeWhile (<= (iX p1 + len - 2)) (iterate (+d) (iX p1)))
-                --else -- if streetAxis st == "oY"   -- p1 must be the upper end   -- iterating ys
-                    --map (MkIntPoint (iX p1)) (takeWhile (<= ((iY p1) + len - 2)) (iterate (+d) (iY p1)))
-        
--- Other implementation using (mod D == 0) predicate
--- already assuming that is a street indeed
-extraBusstopsForStreet :: Shape -> [Busstop]
-extraBusstopsForStreet st = map (Extra st) (filter (isBusstop st) (interpolate' st))
-    where
-        d = defaultBusstopDistance
-        isBusstop st p = if streetAxis st == "oX"
-            then (iX p `mod` d) == 0
-            else (iY p `mod` d) == 0
-                            
-testBusstops :: [Busstop]
-testBusstops = concat [
-    intersectionsOfStreets streets,
-    concatMap deadendsOfStreet streets, 
-    concatMap extraBusstopsForStreet streets -- concatMap OH MY!
-    ]
-    where
-        streets = filter isStreet testShapes
-
-testMiscPixels :: [GenPixel Char]
-testMiscPixels = []
